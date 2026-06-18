@@ -269,8 +269,11 @@
           Empezar a dibujar
         </button>
         <p style="font-size:12px; color:var(--text-dim); margin-top:10px; line-height:1.5">
-          Toca el mapa para marcar los vértices. Doble clic para cerrar el polígono.
+          Toca el mapa para marcar los vértices (mínimo 3). Cuando termines, toca "Cerrar polígono".
         </p>
+        <button class="btn btn-primary" id="btn-cerrar-poly" onclick="cerrarPoligono()" style="margin-top:12px; display:none">
+          ✓ Cerrar polígono
+        </button>
         <button class="btn" id="btn-save-cerca" onclick="guardarCercaActual()" style="margin-top:12px; display:none">
           Guardar cerca
         </button>
@@ -491,14 +494,22 @@ function toggleDraw() {
   drawingMode = !drawingMode;
   const btn = document.getElementById('btn-draw-toggle');
   if (drawingMode) {
-    btn.textContent = 'Dibujando... (doble clic para cerrar)';
+    btn.textContent = 'Dibujando... toca el mapa';
     btn.classList.remove('btn-primary');
+    // Limpiar cualquier dibujo previo en curso
+    tempMarkers.forEach(m => map.removeLayer(m));
+    tempMarkers = [];
+    if (tempPolyline) { map.removeLayer(tempPolyline); tempPolyline = null; }
     currentPolyPts = [];
     map.getContainer().style.cursor = 'crosshair';
+    map.doubleClickZoom.disable();   // que el doble clic no haga zoom
+    document.getElementById('btn-cerrar-poly').style.display = 'none';
+    document.getElementById('btn-save-cerca').style.display = 'none';
   } else {
     btn.textContent = 'Empezar a dibujar';
     btn.classList.add('btn-primary');
     map.getContainer().style.cursor = '';
+    map.doubleClickZoom.enable();
   }
 }
 
@@ -511,18 +522,30 @@ map.on('click', (e) => {
   if (currentPolyPts.length >= 2) {
     tempPolyline = L.polyline(currentPolyPts, { color:'#4ade80', weight:2, dashArray:'6 4' }).addTo(map);
   }
+  // Cuando hay 3+ puntos, mostrar el botón de cerrar polígono
+  if (currentPolyPts.length >= 3) {
+    document.getElementById('btn-cerrar-poly').style.display = 'flex';
+  }
 });
 
-map.on('dblclick', (e) => {
-  if (!drawingMode || currentPolyPts.length < 3) return;
-  L.DomEvent.preventDefault(e);
+// Cerrar el polígono con un botón (más confiable que doble clic)
+function cerrarPoligono() {
+  if (currentPolyPts.length < 3) { alert('Marca al menos 3 puntos en el mapa'); return; }
   drawingMode = false;
   map.getContainer().style.cursor = '';
   if (tempPolyline) map.removeLayer(tempPolyline);
   tempPolyline = L.polygon(currentPolyPts, { color:'#4ade80', fillColor:'#4ade80', fillOpacity:0.2, weight:2 }).addTo(map);
+  document.getElementById('btn-cerrar-poly').style.display = 'none';
   document.getElementById('btn-save-cerca').style.display = 'flex';
   document.getElementById('btn-draw-toggle').textContent = 'Redibujar';
   document.getElementById('btn-draw-toggle').classList.add('btn-primary');
+}
+
+// Doble clic también cierra (como atajo), pero ya no es la única forma
+map.on('dblclick', (e) => {
+  if (!drawingMode || currentPolyPts.length < 3) return;
+  L.DomEvent.preventDefault(e);
+  cerrarPoligono();
 });
 
 function guardarCercaActual() {
@@ -571,9 +594,20 @@ async function enviarCercaAlServidor(cerca) {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
-    if (res.ok) console.log('Cerca guardada en servidor');
+    if (res.ok) {
+      const data = await res.json();
+      console.log('✅ Cerca guardada en servidor:', data);
+      alert('✅ Cerca "' + cerca.nombre + '" guardada en el servidor');
+    } else {
+      const err = await res.text();
+      console.error('❌ Servidor respondió', res.status, err);
+      alert('⚠ El servidor rechazó la cerca (' + res.status + ').\n' + err +
+            '\n\nLa cerca se ve en el mapa pero NO se guardó en el servidor.');
+    }
   } catch(e) {
-    console.log('Modo offline — cerca guardada localmente');
+    console.error('❌ Error de conexión:', e);
+    alert('⚠ No se pudo conectar al servidor.\n' + e.message +
+          '\n\nVerifica que el servidor de Render esté despierto (puede tardar 30s).');
   }
 }
 
