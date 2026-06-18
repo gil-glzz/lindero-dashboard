@@ -210,6 +210,7 @@
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" onclick="showTab('lotes')">Lotes</button>
       <button class="sidebar-tab" onclick="showTab('cerca')">Nueva cerca</button>
+      <button class="sidebar-tab" onclick="showTab('cercas')">Cercas</button>
       <button class="sidebar-tab" onclick="showTab('animales')">Animales</button>
     </div>
     <div class="sidebar-content scroll-thin">
@@ -276,6 +277,15 @@
         </button>
         <button class="btn" id="btn-save-cerca" onclick="guardarCercaActual()" style="margin-top:12px; display:none">
           Guardar cerca
+        </button>
+      </div>
+
+      <!-- CERCAS GUARDADAS -->
+      <div id="pane-cercas" style="display:none">
+        <p class="sec-title">Cercas guardadas</p>
+        <div id="cercas-list"></div>
+        <button class="btn" onclick="showTab('cerca')" style="margin-top:8px">
+          + Nueva cerca
         </button>
       </div>
 
@@ -370,16 +380,13 @@ const CENTRO = [25.6866, -100.3161]; // Monterrey aprox como ejemplo
 const ZOOM = 14;
 
 // ════════════════════════════════════════════════════════════
-//  ESTADO (demo local — en producción viene del API)
+//  ESTADO
 // ════════════════════════════════════════════════════════════
 let lotes = [
-  { id: 1, nombre: 'Becerros zona alta', color: '#4ade80' },
-  { id: 2, nombre: 'Vientres', color: '#60a5fa' }
+  { id: 1, nombre: 'Mi ganado', color: '#4ade80' }
 ];
 let animales = [
-  { id:1, nombre:'Lucero', collar:'collar_01', lote:1, arete:'MX0412345', peso:280, edad:14, raza:'Cebú', sexo:'Hembra', estado:'ok', actividad:4.2, bateria:87, notas:'Vacunada brucela mar/2026', lat:25.690, lng:-100.318 },
-  { id:2, nombre:'Tornado', collar:'collar_02', lote:1, arete:'MX0412346', peso:310, edad:16, raza:'Brahman', sexo:'Macho', estado:'warn', actividad:6.8, bateria:62, notas:'', lat:25.684, lng:-100.312 },
-  { id:3, nombre:'Estrella', collar:'collar_03', lote:2, arete:'MX0412347', peso:420, edad:36, raza:'Angus', sexo:'Hembra', estado:'ok', actividad:2.1, bateria:94, notas:'Preñada — 5 meses', lat:25.688, lng:-100.320 }
+  { id:1, nombre:'Collar 01', collar:'collar_01', lote:1, arete:'', peso:0, edad:0, raza:'Cruza', sexo:'Hembra', estado:'ok', actividad:0, bateria:100, notas:'', lat:26.9887, lng:-102.0723 }
 ];
 let cercas = [];
 let selectedLote = null;
@@ -598,6 +605,8 @@ async function enviarCercaAlServidor(cerca) {
       const data = await res.json();
       console.log('✅ Cerca guardada en servidor:', data);
       alert('✅ Cerca "' + cerca.nombre + '" guardada en el servidor');
+      // Recargar las cercas del servidor para tener el ID real (necesario para borrar)
+      actualizarDesdeServidor();
     } else {
       const err = await res.text();
       console.error('❌ Servidor respondió', res.status, err);
@@ -783,16 +792,17 @@ function cerrarModal() { document.getElementById('modal-animal').classList.remov
 //  TABS Y UTILIDADES
 // ════════════════════════════════════════════════════════════
 function showTab(t) {
-  ['lotes','nuevolote','cerca','animales'].forEach(p => {
+  ['lotes','nuevolote','cerca','cercas','animales'].forEach(p => {
     const el = document.getElementById('pane-'+p);
     if (el) el.style.display = (p===t) ? 'block' : 'none';
   });
   document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
-  const tabMap = { lotes:0, cerca:1, animales:2 };
+  const tabMap = { lotes:0, cerca:1, cercas:2, animales:3 };
   if (tabMap[t] !== undefined) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
   }
   if (t === 'cerca') refreshCercaLoteSelect();
+  if (t === 'cercas') renderCercasList();
 }
 
 function toggleHoras() {
@@ -825,19 +835,94 @@ PALETA.forEach((c,i) => {
 //  POLLING DEL SERVIDOR (cada 30s en producción)
 // ════════════════════════════════════════════════════════════
 async function actualizarDesdeServidor() {
+  // 1. Posiciones de los collares
   try {
     const res = await fetch(`${API_BASE}/collares`);
-    if (!res.ok) return;
-    const collares = await res.json();
-    collares.forEach(c => {
-      const a = animales.find(x => x.collar === c.device);
-      if (a) {
-        a.lat = c.lat; a.lng = c.lng; a.estado = c.estado;
-        if (c.shock_pwr) a.shock_pwr = c.shock_pwr;
-      }
-    });
-    renderAnimales(); renderLotes();
-  } catch(e) { /* offline, usa datos demo */ }
+    if (res.ok) {
+      const collares = await res.json();
+      collares.forEach(c => {
+        const a = animales.find(x => x.collar === c.device);
+        if (a) {
+          a.lat = c.lat; a.lng = c.lng; a.estado = c.estado;
+          if (c.shock_pwr) a.shock_pwr = c.shock_pwr;
+        }
+      });
+      renderAnimales(); renderLotes();
+    }
+  } catch(e) { /* sin conexión */ }
+
+  // 2. Cercas guardadas en el servidor
+  try {
+    const res = await fetch(`${API_BASE}/geovallas`);
+    if (res.ok) {
+      const data = await res.json();
+      cercas = data.map(g => ({
+        id: g.id,
+        nombre: g.nombre,
+        tipo: g.tipo,
+        color: g.color || '#4ade80',
+        warn_dist_m: g.warn_dist_m,
+        poligono: typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono,
+        collares: typeof g.collares === 'string' ? JSON.parse(g.collares) : (g.collares || []),
+        expiraEn: g.expira_en ? new Date(g.expira_en).getTime() : null,
+        delServidor: true
+      }));
+      renderCercas();
+      renderCercasList();
+    }
+  } catch(e) { /* sin conexión */ }
+}
+
+// Borrar una cerca (en el servidor y en el mapa)
+async function borrarCerca(id) {
+  if (!confirm('¿Borrar esta cerca? Los collares dejarán de usarla.')) return;
+  try {
+    const res = await fetch(`${API_BASE}/geovallas/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      cercas = cercas.filter(c => c.id !== id);
+      renderCercas();
+      renderCercasList();
+    } else {
+      alert('No se pudo borrar la cerca en el servidor.');
+    }
+  } catch(e) {
+    alert('Error de conexión al borrar.');
+  }
+}
+
+// Render de la lista de cercas guardadas
+function renderCercasList() {
+  const cont = document.getElementById('cercas-list');
+  if (!cont) return;
+  if (!cercas.length) {
+    cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:16px 0;">No hay cercas guardadas. Dibuja una en "Nueva cerca".</p>';
+    return;
+  }
+  cont.innerHTML = cercas.map(c => {
+    const tipoLabel = c.tipo === 'temporal' ? 'Temporal' : c.tipo === 'exclusion' ? 'Exclusión' : 'Permanente';
+    let timer = '';
+    if (c.expiraEn) {
+      const ms = c.expiraEn - Date.now();
+      timer = ms > 0 ? ` · expira en ${Math.floor(ms/3600000)}h` : ' · expirada';
+    }
+    return `<div class="lote-card" onclick="irACerca(${JSON.stringify(c.poligono).replace(/"/g,'&quot;')})">
+      <div class="lote-head">
+        <div class="lote-color" style="background:${c.color}"></div>
+        <div class="lote-name">${c.nombre}</div>
+        <button onclick="event.stopPropagation(); borrarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Borrar</button>
+      </div>
+      <div class="lote-meta">
+        <span>${tipoLabel}</span><span>${c.poligono.length} vértices</span><span>aviso ${c.warn_dist_m}m${timer}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Centrar el mapa en una cerca al tocarla en la lista
+function irACerca(poligono) {
+  if (!poligono || !poligono.length) return;
+  const bounds = L.latLngBounds(poligono.map(p => [p.lat, p.lng]));
+  map.fitBounds(bounds.pad(0.2));
 }
 
 // ════════════════════════════════════════════════════════════
