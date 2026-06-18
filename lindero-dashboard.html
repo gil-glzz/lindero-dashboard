@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lindero — Panel de cercas digitales</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1410;
+    --panel: #141d16;
+    --panel-2: #1a2519;
+    --border: #2a3a2c;
+    --text: #e8efe6;
+    --text-dim: #8fa890;
+    --accent: #4ade80;
+    --accent-dim: #22633f;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bg); font-weight: 700; font-family: var(--font-display);
+    font-size: 18px;
+  }
+  .logo h1 {
+    font-family: var(--font-display); font-size: 19px; font-weight: 500;
+    letter-spacing: -0.5px;
+  }
+  .logo .tag { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+  .header-stats { display: flex; gap: 24px; }
+  .hstat { text-align: right; }
+  .hstat .num { font-family: var(--font-display); font-size: 18px; font-weight: 500; }
+  .hstat .lbl { font-size: 11px; color: var(--text-dim); }
+
+  /* ── Layout ── */
+  .main { flex: 1; display: flex; overflow: hidden; }
+  .sidebar {
+    width: 320px; background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+  }
+  .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .sidebar-tab {
+    flex: 1; padding: 12px; background: none; border: none;
+    color: var(--text-dim); font-size: 12px; font-weight: 500; cursor: pointer;
+    font-family: var(--font-body); letter-spacing: 0.3px;
+    border-bottom: 2px solid transparent; transition: all .15s;
+  }
+  .sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .sidebar-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+  #map { flex: 1; min-height: 100%; height: 100%; background: #0a0f0a; position: relative; z-index: 1; }
+
+  /* ── Lotes ── */
+  .lote-card {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .lote-card:hover { border-color: var(--accent-dim); }
+  .lote-card.selected { border-color: var(--accent); }
+  .lote-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .lote-color { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+  .lote-name { font-weight: 500; font-size: 14px; flex: 1; }
+  .lote-count { font-size: 12px; color: var(--text-dim); background: var(--bg); padding: 2px 8px; border-radius: 10px; }
+  .lote-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-dim); }
+  .lote-meta span { display: flex; align-items: center; gap: 4px; }
+
+  /* ── Botones ── */
+  .btn {
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    padding: 9px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all .15s; width: 100%;
+  }
+  .btn:hover { background: var(--accent-dim); border-color: var(--accent); }
+  .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn-primary:hover { background: #3dd16f; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; width: auto; }
+  .btn-ghost { background: transparent; }
+
+  /* ── Forms ── */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 12px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    font-family: var(--font-body); font-size: 13px;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .color-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-opt { width: 30px; height: 30px; border-radius: 7px; cursor: pointer; border: 2px solid transparent; }
+  .color-opt.active { border-color: var(--text); }
+
+  /* ── Section title ── */
+  .sec-title {
+    font-family: var(--font-display); font-size: 12px; font-weight: 500;
+    color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;
+    margin: 4px 0 12px;
+  }
+
+  /* ── Animal profile modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: none; align-items: center; justify-content: center; z-index: 2000;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; width: 100%; max-width: 480px; max-height: 90vh;
+    overflow-y: auto; padding: 24px;
+  }
+  .modal-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .animal-avatar {
+    width: 56px; height: 56px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--bg);
+    flex-shrink: 0;
+  }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-stat { background: var(--panel-2); border-radius: 10px; padding: 12px; }
+  .modal-stat .lbl { font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+  .modal-stat .val { font-family: var(--font-display); font-size: 16px; font-weight: 500; }
+  .close-x {
+    background: none; border: none; color: var(--text-dim); font-size: 24px;
+    cursor: pointer; margin-left: auto;
+  }
+  .status-pill { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 12px; }
+  .st-ok { background: var(--accent-dim); color: var(--accent); }
+  .st-warn { background: #4a3a0a; color: var(--warn); }
+  .st-shock { background: #4a1414; color: var(--danger); }
+
+  /* ── Map controls overlay ── */
+  .map-controls {
+    position: absolute; top: 12px; right: 12px; z-index: 1000;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .map-btn {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font-body);
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+  .map-btn:hover { background: var(--panel-2); }
+  .map-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  .leaflet-container { background: #0a0f0a; }
+  .animal-marker {
+    border-radius: 50%; border: 2px solid white;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.3);
+  }
+  .scroll-thin::-webkit-scrollbar { width: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 720px) {
+    .sidebar { width: 100%; position: absolute; z-index: 1500; height: 60%; bottom: 0; top: auto; border-right: none; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; }
+    .header-stats { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">L</div>
+    <div>
+      <h1>Lindero</h1>
+      <div class="tag">Cercas digitales</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="num" id="stat-animales">0</div><div class="lbl">animales</div></div>
+    <div class="hstat"><div class="num" id="stat-lotes">0</div><div class="lbl">lotes</div></div>
+    <div class="hstat"><div class="num" style="color:var(--accent)" id="stat-dentro">0</div><div class="lbl">dentro</div></div>
+    <div class="hstat"><div class="num" style="color:var(--danger)" id="stat-alertas">0</div><div class="lbl">alertas</div></div>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" onclick="showTab('lotes')">Lotes</button>
+      <button class="sidebar-tab" onclick="showTab('cerca')">Nueva cerca</button>
+      <button class="sidebar-tab" onclick="showTab('animales')">Animales</button>
+    </div>
+    <div class="sidebar-content scroll-thin">
+
+      <!-- LOTES -->
+      <div id="pane-lotes">
+        <p class="sec-title">Lotes de ganado</p>
+        <div id="lotes-list"></div>
+        <button class="btn" onclick="showTab('nuevolote')" style="margin-top:8px">
+          + Agregar lote
+        </button>
+      </div>
+
+      <!-- NUEVO LOTE -->
+      <div id="pane-nuevolote" style="display:none">
+        <p class="sec-title">Nuevo lote</p>
+        <div class="field">
+          <label>Nombre del lote</label>
+          <input id="lote-nombre" placeholder="Ej: Becerros zona alta"/>
+        </div>
+        <div class="field">
+          <label>Color identificador</label>
+          <div class="color-picker" id="lote-colors"></div>
+        </div>
+        <button class="btn btn-primary" onclick="crearLote()">Crear lote</button>
+        <button class="btn btn-ghost" onclick="showTab('lotes')" style="margin-top:8px">Cancelar</button>
+      </div>
+
+      <!-- NUEVA CERCA -->
+      <div id="pane-cerca" style="display:none">
+        <p class="sec-title">Dibujar cerca</p>
+        <div class="field">
+          <label>Lote asignado</label>
+          <select id="cerca-lote"></select>
+        </div>
+        <div class="field">
+          <label>Nombre del potrero</label>
+          <input id="cerca-nombre" placeholder="Ej: Potrero norte"/>
+        </div>
+        <div class="field">
+          <label>Tipo de cerca</label>
+          <select id="cerca-tipo" onchange="toggleHoras()">
+            <option value="permanente">Permanente</option>
+            <option value="temporal">Temporal</option>
+            <option value="exclusion">Exclusión (prohibida)</option>
+          </select>
+        </div>
+        <div class="field" id="field-horas" style="display:none">
+          <label>Duración (horas)</label>
+          <input id="cerca-horas" type="number" value="6" min="1" max="72"/>
+        </div>
+        <div class="field">
+          <label>Zona de aviso (metros)</label>
+          <input id="cerca-warn" type="number" value="12" min="5" max="100"/>
+        </div>
+        <button class="btn btn-primary" id="btn-draw-toggle" onclick="toggleDraw()">
+          Empezar a dibujar
+        </button>
+        <p style="font-size:12px; color:var(--text-dim); margin-top:10px; line-height:1.5">
+          Toca el mapa para marcar los vértices (mínimo 3). Cuando termines, toca "Cerrar polígono".
+        </p>
+        <button class="btn btn-primary" id="btn-cerrar-poly" onclick="cerrarPoligono()" style="margin-top:12px; display:none">
+          ✓ Cerrar polígono
+        </button>
+        <button class="btn" id="btn-save-cerca" onclick="guardarCercaActual()" style="margin-top:12px; display:none">
+          Guardar cerca
+        </button>
+      </div>
+
+      <!-- ANIMALES -->
+      <div id="pane-animales" style="display:none">
+        <p class="sec-title">Registro de animales</p>
+        <div id="animales-list"></div>
+        <button class="btn" onclick="abrirNuevoAnimal()" style="margin-top:8px">
+          + Registrar animal
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <div style="flex:1; position:relative; height:100%; min-height:0;">
+    <div id="map"></div>
+    <div class="map-controls">
+      <button class="map-btn active" id="layer-sat" onclick="setLayer('sat')">Satélite</button>
+      <button class="map-btn" id="layer-terr" onclick="setLayer('terr')">Terreno</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PERFIL ANIMAL -->
+<div class="modal-overlay" id="modal-animal">
+  <div class="modal scroll-thin">
+    <div class="modal-head">
+      <div class="animal-avatar" id="modal-avatar">—</div>
+      <div style="flex:1">
+        <div id="modal-name" style="font-family:var(--font-display); font-size:20px; font-weight:500"></div>
+        <div id="modal-collar" style="font-size:12px; color:var(--text-dim)"></div>
+      </div>
+      <button class="close-x" onclick="cerrarModal()">&times;</button>
+    </div>
+
+    <div id="modal-view">
+      <div class="modal-grid" style="margin-bottom:16px">
+        <div class="modal-stat"><div class="lbl">Estado</div><div class="val"><span class="status-pill st-ok" id="modal-estado">Dentro</span></div></div>
+        <div class="modal-stat"><div class="lbl">Lote</div><div class="val" id="modal-lote">—</div></div>
+        <div class="modal-stat"><div class="lbl">Peso</div><div class="val" id="modal-peso">—</div></div>
+        <div class="modal-stat"><div class="lbl">Edad</div><div class="val" id="modal-edad">—</div></div>
+        <div class="modal-stat"><div class="lbl">Raza</div><div class="val" id="modal-raza">—</div></div>
+        <div class="modal-stat"><div class="lbl">Sexo</div><div class="val" id="modal-sexo">—</div></div>
+        <div class="modal-stat"><div class="lbl">Actividad hoy</div><div class="val" id="modal-actividad">—</div></div>
+        <div class="modal-stat"><div class="lbl">Batería collar</div><div class="val" id="modal-bateria">—</div></div>
+      </div>
+      <div class="field"><label>Arete / ID</label><div id="modal-arete" style="font-size:14px">—</div></div>
+      <div class="field"><label>Notas sanitarias</label><div id="modal-notas" style="font-size:14px; line-height:1.5">—</div></div>
+      <button class="btn" onclick="editarAnimal()" style="margin-top:8px">Editar perfil</button>
+    </div>
+
+    <div id="modal-edit" style="display:none">
+      <div class="field"><label>Nombre / apodo</label><input id="ed-nombre"/></div>
+      <div class="field"><label>ID del collar</label><input id="ed-collar" placeholder="collar_01"/></div>
+      <div class="field"><label>Arete oficial (SINIIGA)</label><input id="ed-arete"/></div>
+      <div class="modal-grid">
+        <div class="field"><label>Peso (kg)</label><input id="ed-peso" type="number"/></div>
+        <div class="field"><label>Edad (meses)</label><input id="ed-edad" type="number"/></div>
+      </div>
+      <div class="modal-grid">
+        <div class="field"><label>Raza</label>
+          <select id="ed-raza">
+            <option>Cebú</option><option>Brahman</option><option>Angus</option>
+            <option>Charolais</option><option>Suizo</option><option>Cruza</option><option>Otra</option>
+          </select>
+        </div>
+        <div class="field"><label>Sexo</label>
+          <select id="ed-sexo"><option>Hembra</option><option>Macho</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Lote</label><select id="ed-lote"></select></div>
+      <div class="field"><label>Notas sanitarias</label><textarea id="ed-notas" rows="3" placeholder="Vacunas, tratamientos, observaciones..."></textarea></div>
+      <button class="btn btn-primary" onclick="guardarAnimal()">Guardar perfil</button>
+      <button class="btn btn-ghost" onclick="cancelarEdit()" style="margin-top:8px">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════════
+const API_BASE = 'https://collar-gps-server.onrender.com'; // cambiar por tu URL de Render
+
+const PALETA = ['#4ade80','#f87171','#fbbf24','#60a5fa','#c084fc','#fb923c','#2dd4bf','#f472b6'];
+
+// Centro inicial — ajustar al rancho real
+const CENTRO = [25.6866, -100.3161]; // Monterrey aprox como ejemplo
+const ZOOM = 14;
+
+// ════════════════════════════════════════════════════════════
+//  ESTADO (demo local — en producción viene del API)
+// ════════════════════════════════════════════════════════════
+let lotes = [
+  { id: 1, nombre: 'Becerros zona alta', color: '#4ade80' },
+  { id: 2, nombre: 'Vientres', color: '#60a5fa' }
+];
+let animales = [
+  { id:1, nombre:'Lucero', collar:'collar_01', lote:1, arete:'MX0412345', peso:280, edad:14, raza:'Cebú', sexo:'Hembra', estado:'ok', actividad:4.2, bateria:87, notas:'Vacunada brucela mar/2026', lat:25.690, lng:-100.318 },
+  { id:2, nombre:'Tornado', collar:'collar_02', lote:1, arete:'MX0412346', peso:310, edad:16, raza:'Brahman', sexo:'Macho', estado:'warn', actividad:6.8, bateria:62, notas:'', lat:25.684, lng:-100.312 },
+  { id:3, nombre:'Estrella', collar:'collar_03', lote:2, arete:'MX0412347', peso:420, edad:36, raza:'Angus', sexo:'Hembra', estado:'ok', actividad:2.1, bateria:94, notas:'Preñada — 5 meses', lat:25.688, lng:-100.320 }
+];
+let cercas = [];
+let selectedLote = null;
+let editingAnimalId = null;
+let drawingMode = false;
+let currentPolyPts = [];
+let tempPolyline = null;
+let tempMarkers = [];
+
+// ════════════════════════════════════════════════════════════
+//  MAPA
+// ════════════════════════════════════════════════════════════
+const map = L.map('map', { zoomControl: false }).setView(CENTRO, ZOOM);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Proveedores satelitales — con fallback automático si uno falla
+const SAT_PROVIDERS = [
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+];
+let satProviderIdx = 0;
+let satErrorCount = 0;
+
+function makeSatLayer(idx) {
+  const layer = L.tileLayer(SAT_PROVIDERS[idx], {
+    attribution: 'Mapa', maxZoom: 19, crossOrigin: true
+  });
+  layer.on('tileerror', () => {
+    satErrorCount++;
+    if (satErrorCount > 3 && satProviderIdx < SAT_PROVIDERS.length - 1) {
+      satErrorCount = 0;
+      satProviderIdx++;
+      map.removeLayer(satLayer);
+      satLayer = makeSatLayer(satProviderIdx);
+      satLayer.addTo(map);
+    }
+  });
+  return layer;
+}
+
+let satLayer = makeSatLayer(0);
+const terrLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: 'OpenStreetMap', maxZoom: 19
+});
+satLayer.addTo(map);
+
+// invalidateSize robusto: corrige el "mapa negro" en contenedores flex.
+// Se llama varias veces porque el layout puede estabilizarse tarde.
+function fixMapSize() { map.invalidateSize(true); }
+setTimeout(fixMapSize, 100);
+setTimeout(fixMapSize, 500);
+setTimeout(fixMapSize, 1200);
+window.addEventListener('load', fixMapSize);
+window.addEventListener('resize', fixMapSize);
+
+function setLayer(t) {
+  if (t === 'sat') { map.removeLayer(terrLayer); satLayer.addTo(map); }
+  else { if(map.hasLayer(satLayer)) map.removeLayer(satLayer); terrLayer.addTo(map); }
+  document.getElementById('layer-sat').classList.toggle('active', t==='sat');
+  document.getElementById('layer-terr').classList.toggle('active', t==='terr');
+  setTimeout(fixMapSize, 100);
+}
+
+// Capas de animales y cercas
+let animalMarkers = {};
+let cercaLayers = {};
+
+function renderAnimales() {
+  Object.values(animalMarkers).forEach(m => map.removeLayer(m));
+  animalMarkers = {};
+  animales.forEach(a => {
+    const lote = lotes.find(l => l.id === a.lote);
+    const color = lote ? lote.color : '#888';
+    const borderColor = a.estado === 'shock' ? '#f87171' : a.estado === 'warn' ? '#fbbf24' : 'white';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="animal-marker" style="width:18px;height:18px;background:${color};border-color:${borderColor}"></div>`,
+      iconSize: [18,18], iconAnchor: [9,9]
+    });
+    const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
+    m.on('click', () => abrirPerfilAnimal(a.id));
+    m.bindTooltip(a.nombre, { direction: 'top', offset: [0,-10] });
+    animalMarkers[a.id] = m;
+  });
+}
+
+function renderCercas() {
+  Object.values(cercaLayers).forEach(l => map.removeLayer(l));
+  cercaLayers = {};
+  cercas.forEach(c => {
+    const latlngs = c.poligono.map(p => [p.lat, p.lng]);
+    const poly = L.polygon(latlngs, {
+      color: c.color, fillColor: c.color, fillOpacity: 0.15, weight: 2,
+      dashArray: c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null
+    }).addTo(map);
+    let popup = `<b>${c.nombre}</b><br>${c.tipo}`;
+    if (c.expiraEn) {
+      const ms = c.expiraEn - Date.now();
+      const h = Math.max(0, Math.floor(ms/3600000));
+      popup += `<br>Expira en ${h}h`;
+    }
+    poly.bindPopup(popup);
+    cercaLayers[c.id] = poly;
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  DIBUJO DE CERCAS
+// ════════════════════════════════════════════════════════════
+function toggleDraw() {
+  drawingMode = !drawingMode;
+  const btn = document.getElementById('btn-draw-toggle');
+  if (drawingMode) {
+    btn.textContent = 'Dibujando... toca el mapa';
+    btn.classList.remove('btn-primary');
+    // Limpiar cualquier dibujo previo en curso
+    tempMarkers.forEach(m => map.removeLayer(m));
+    tempMarkers = [];
+    if (tempPolyline) { map.removeLayer(tempPolyline); tempPolyline = null; }
+    currentPolyPts = [];
+    map.getContainer().style.cursor = 'crosshair';
+    map.doubleClickZoom.disable();   // que el doble clic no haga zoom
+    document.getElementById('btn-cerrar-poly').style.display = 'none';
+    document.getElementById('btn-save-cerca').style.display = 'none';
+  } else {
+    btn.textContent = 'Empezar a dibujar';
+    btn.classList.add('btn-primary');
+    map.getContainer().style.cursor = '';
+    map.doubleClickZoom.enable();
+  }
+}
+
+map.on('click', (e) => {
+  if (!drawingMode) return;
+  currentPolyPts.push([e.latlng.lat, e.latlng.lng]);
+  const m = L.circleMarker(e.latlng, { radius: 5, color: '#4ade80', fillColor:'#4ade80', fillOpacity:1 }).addTo(map);
+  tempMarkers.push(m);
+  if (tempPolyline) map.removeLayer(tempPolyline);
+  if (currentPolyPts.length >= 2) {
+    tempPolyline = L.polyline(currentPolyPts, { color:'#4ade80', weight:2, dashArray:'6 4' }).addTo(map);
+  }
+  // Cuando hay 3+ puntos, mostrar el botón de cerrar polígono
+  if (currentPolyPts.length >= 3) {
+    document.getElementById('btn-cerrar-poly').style.display = 'flex';
+  }
+});
+
+// Cerrar el polígono con un botón (más confiable que doble clic)
+function cerrarPoligono() {
+  if (currentPolyPts.length < 3) { alert('Marca al menos 3 puntos en el mapa'); return; }
+  drawingMode = false;
+  map.getContainer().style.cursor = '';
+  if (tempPolyline) map.removeLayer(tempPolyline);
+  tempPolyline = L.polygon(currentPolyPts, { color:'#4ade80', fillColor:'#4ade80', fillOpacity:0.2, weight:2 }).addTo(map);
+  document.getElementById('btn-cerrar-poly').style.display = 'none';
+  document.getElementById('btn-save-cerca').style.display = 'flex';
+  document.getElementById('btn-draw-toggle').textContent = 'Redibujar';
+  document.getElementById('btn-draw-toggle').classList.add('btn-primary');
+}
+
+// Doble clic también cierra (como atajo), pero ya no es la única forma
+map.on('dblclick', (e) => {
+  if (!drawingMode || currentPolyPts.length < 3) return;
+  L.DomEvent.preventDefault(e);
+  cerrarPoligono();
+});
+
+function guardarCercaActual() {
+  if (currentPolyPts.length < 3) { alert('Dibuja al menos 3 puntos'); return; }
+  const loteId = parseInt(document.getElementById('cerca-lote').value);
+  const lote = lotes.find(l => l.id === loteId);
+  const tipo = document.getElementById('cerca-tipo').value;
+  const horas = parseInt(document.getElementById('cerca-horas').value) || 6;
+  const cerca = {
+    id: Date.now(),
+    nombre: document.getElementById('cerca-nombre').value || 'Potrero',
+    tipo,
+    color: tipo === 'exclusion' ? '#f87171' : (lote ? lote.color : '#4ade80'),
+    warn_dist_m: parseInt(document.getElementById('cerca-warn').value) || 12,
+    poligono: currentPolyPts.map(p => ({ lat: p[0], lng: p[1] })),
+    collares: animales.filter(a => a.lote === loteId).map(a => a.collar),
+    expiraEn: tipo === 'temporal' ? Date.now() + horas*3600000 : null
+  };
+  cercas.push(cerca);
+
+  // Limpiar dibujo temporal
+  tempMarkers.forEach(m => map.removeLayer(m));
+  tempMarkers = [];
+  if (tempPolyline) { map.removeLayer(tempPolyline); tempPolyline = null; }
+  currentPolyPts = [];
+
+  renderCercas();
+  document.getElementById('btn-save-cerca').style.display = 'none';
+
+  // POST al servidor (comentado para demo offline)
+  // postCerca(cerca);
+  enviarCercaAlServidor(cerca);
+
+  showTab('lotes');
+}
+
+async function enviarCercaAlServidor(cerca) {
+  const payload = {
+    nombre: cerca.nombre, tipo: cerca.tipo,
+    poligono: cerca.poligono, warn_dist_m: cerca.warn_dist_m,
+    color: cerca.color, collares: cerca.collares,
+    ...(cerca.tipo === 'temporal' ? { horas: Math.round((cerca.expiraEn - Date.now())/3600000) } : {})
+  };
+  try {
+    const res = await fetch(`${API_BASE}/geovallas`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      console.log('✅ Cerca guardada en servidor:', data);
+      alert('✅ Cerca "' + cerca.nombre + '" guardada en el servidor');
+    } else {
+      const err = await res.text();
+      console.error('❌ Servidor respondió', res.status, err);
+      alert('⚠ El servidor rechazó la cerca (' + res.status + ').\n' + err +
+            '\n\nLa cerca se ve en el mapa pero NO se guardó en el servidor.');
+    }
+  } catch(e) {
+    console.error('❌ Error de conexión:', e);
+    alert('⚠ No se pudo conectar al servidor.\n' + e.message +
+          '\n\nVerifica que el servidor de Render esté despierto (puede tardar 30s).');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  LOTES
+// ════════════════════════════════════════════════════════════
+function renderLotes() {
+  const cont = document.getElementById('lotes-list');
+  cont.innerHTML = lotes.map(l => {
+    const count = animales.filter(a => a.lote === l.id).length;
+    const dentro = animales.filter(a => a.lote === l.id && a.estado === 'ok').length;
+    const cercaLote = cercas.find(c => c.collares?.some(col => animales.find(a => a.collar===col && a.lote===l.id)));
+    return `<div class="lote-card ${selectedLote===l.id?'selected':''}" onclick="selectLote(${l.id})">
+      <div class="lote-head">
+        <div class="lote-color" style="background:${l.color}"></div>
+        <div class="lote-name">${l.nombre}</div>
+        <div class="lote-count">${count}</div>
+      </div>
+      <div class="lote-meta">
+        <span>● ${dentro} dentro</span>
+        <span>${cercaLote ? '◈ con cerca' : '○ sin cerca'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  updateStats();
+  refreshCercaLoteSelect();
+}
+
+function selectLote(id) {
+  selectedLote = selectedLote === id ? null : id;
+  renderLotes();
+  // centrar mapa en los animales del lote
+  const lAnimales = animales.filter(a => a.lote === id);
+  if (lAnimales.length) {
+    const bounds = L.latLngBounds(lAnimales.map(a => [a.lat, a.lng]));
+    map.fitBounds(bounds.pad(0.3));
+  }
+}
+
+function crearLote() {
+  const nombre = document.getElementById('lote-nombre').value;
+  if (!nombre) { alert('Ponle nombre al lote'); return; }
+  const color = document.querySelector('.color-opt.active')?.dataset.c || PALETA[lotes.length % PALETA.length];
+  lotes.push({ id: Date.now(), nombre, color });
+  document.getElementById('lote-nombre').value = '';
+  renderLotes();
+  showTab('lotes');
+}
+
+function refreshCercaLoteSelect() {
+  ['cerca-lote','ed-lote'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
+    if (val) sel.value = val;
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  ANIMALES
+// ════════════════════════════════════════════════════════════
+function renderAnimalesList() {
+  const cont = document.getElementById('animales-list');
+  cont.innerHTML = animales.map(a => {
+    const lote = lotes.find(l => l.id === a.lote);
+    const stColor = a.estado==='shock'?'#f87171':a.estado==='warn'?'#fbbf24':'#4ade80';
+    return `<div class="lote-card" onclick="abrirPerfilAnimal(${a.id})">
+      <div class="lote-head">
+        <div class="lote-color" style="background:${lote?lote.color:'#888'}"></div>
+        <div class="lote-name">${a.nombre}</div>
+        <div class="lote-count" style="background:${stColor}22; color:${stColor}">${a.collar}</div>
+      </div>
+      <div class="lote-meta">
+        <span>${a.raza}</span><span>${a.peso}kg</span><span>🔋 ${a.bateria}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function abrirPerfilAnimal(id) {
+  const a = animales.find(x => x.id === id);
+  if (!a) return;
+  editingAnimalId = id;
+  const lote = lotes.find(l => l.id === a.lote);
+  document.getElementById('modal-view').style.display = 'block';
+  document.getElementById('modal-edit').style.display = 'none';
+  document.getElementById('modal-avatar').textContent = a.nombre[0];
+  document.getElementById('modal-avatar').style.background = lote ? lote.color : '#888';
+  document.getElementById('modal-name').textContent = a.nombre;
+  document.getElementById('modal-collar').textContent = a.collar + ' · arete ' + a.arete;
+  const estEl = document.getElementById('modal-estado');
+  estEl.textContent = a.estado==='ok'?'Dentro':a.estado==='warn'?'Cerca del límite':'Fuera';
+  estEl.className = 'status-pill ' + (a.estado==='ok'?'st-ok':a.estado==='warn'?'st-warn':'st-shock');
+  document.getElementById('modal-lote').textContent = lote ? lote.nombre : '—';
+  document.getElementById('modal-peso').textContent = a.peso + ' kg';
+  document.getElementById('modal-edad').textContent = a.edad + ' meses';
+  document.getElementById('modal-raza').textContent = a.raza;
+  document.getElementById('modal-sexo').textContent = a.sexo;
+  document.getElementById('modal-actividad').textContent = a.actividad + ' h';
+  document.getElementById('modal-bateria').textContent = a.bateria + '%';
+  document.getElementById('modal-arete').textContent = a.arete || '—';
+  document.getElementById('modal-notas').textContent = a.notas || 'Sin notas';
+  document.getElementById('modal-animal').classList.add('open');
+}
+
+function abrirNuevoAnimal() {
+  editingAnimalId = null;
+  document.getElementById('modal-view').style.display = 'none';
+  document.getElementById('modal-edit').style.display = 'block';
+  document.getElementById('modal-avatar').textContent = '+';
+  document.getElementById('modal-avatar').style.background = '#4ade80';
+  document.getElementById('modal-name').textContent = 'Nuevo animal';
+  document.getElementById('modal-collar').textContent = '';
+  ['ed-nombre','ed-collar','ed-arete','ed-peso','ed-edad','ed-notas'].forEach(i=>document.getElementById(i).value='');
+  refreshCercaLoteSelect();
+  document.getElementById('modal-animal').classList.add('open');
+}
+
+function editarAnimal() {
+  const a = animales.find(x => x.id === editingAnimalId);
+  if (!a) return;
+  document.getElementById('modal-view').style.display = 'none';
+  document.getElementById('modal-edit').style.display = 'block';
+  document.getElementById('ed-nombre').value = a.nombre;
+  document.getElementById('ed-collar').value = a.collar;
+  document.getElementById('ed-arete').value = a.arete;
+  document.getElementById('ed-peso').value = a.peso;
+  document.getElementById('ed-edad').value = a.edad;
+  document.getElementById('ed-raza').value = a.raza;
+  document.getElementById('ed-sexo').value = a.sexo;
+  document.getElementById('ed-notas').value = a.notas;
+  refreshCercaLoteSelect();
+  document.getElementById('ed-lote').value = a.lote;
+}
+
+function guardarAnimal() {
+  const datos = {
+    nombre: document.getElementById('ed-nombre').value || 'Sin nombre',
+    collar: document.getElementById('ed-collar').value || 'collar_??',
+    arete: document.getElementById('ed-arete').value,
+    peso: parseInt(document.getElementById('ed-peso').value) || 0,
+    edad: parseInt(document.getElementById('ed-edad').value) || 0,
+    raza: document.getElementById('ed-raza').value,
+    sexo: document.getElementById('ed-sexo').value,
+    lote: parseInt(document.getElementById('ed-lote').value),
+    notas: document.getElementById('ed-notas').value
+  };
+  if (editingAnimalId) {
+    const a = animales.find(x => x.id === editingAnimalId);
+    Object.assign(a, datos);
+  } else {
+    animales.push({
+      id: Date.now(), ...datos,
+      estado:'ok', actividad:0, bateria:100,
+      lat: CENTRO[0] + (Math.random()-.5)*0.01,
+      lng: CENTRO[1] + (Math.random()-.5)*0.01
+    });
+  }
+  renderAnimales();
+  renderAnimalesList();
+  renderLotes();
+  cerrarModal();
+}
+
+function cancelarEdit() {
+  if (editingAnimalId) abrirPerfilAnimal(editingAnimalId);
+  else cerrarModal();
+}
+function cerrarModal() { document.getElementById('modal-animal').classList.remove('open'); }
+
+// ════════════════════════════════════════════════════════════
+//  TABS Y UTILIDADES
+// ════════════════════════════════════════════════════════════
+function showTab(t) {
+  ['lotes','nuevolote','cerca','animales'].forEach(p => {
+    const el = document.getElementById('pane-'+p);
+    if (el) el.style.display = (p===t) ? 'block' : 'none';
+  });
+  document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
+  const tabMap = { lotes:0, cerca:1, animales:2 };
+  if (tabMap[t] !== undefined) {
+    document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
+  }
+  if (t === 'cerca') refreshCercaLoteSelect();
+}
+
+function toggleHoras() {
+  const tipo = document.getElementById('cerca-tipo').value;
+  document.getElementById('field-horas').style.display = tipo==='temporal'?'block':'none';
+}
+
+function updateStats() {
+  document.getElementById('stat-animales').textContent = animales.length;
+  document.getElementById('stat-lotes').textContent = lotes.length;
+  document.getElementById('stat-dentro').textContent = animales.filter(a=>a.estado==='ok').length;
+  document.getElementById('stat-alertas').textContent = animales.filter(a=>a.estado!=='ok').length;
+}
+
+// Color picker para lotes
+const colorCont = document.getElementById('lote-colors');
+PALETA.forEach((c,i) => {
+  const d = document.createElement('div');
+  d.className = 'color-opt' + (i===0?' active':'');
+  d.style.background = c;
+  d.dataset.c = c;
+  d.onclick = () => {
+    document.querySelectorAll('.color-opt').forEach(x=>x.classList.remove('active'));
+    d.classList.add('active');
+  };
+  colorCont.appendChild(d);
+});
+
+// ════════════════════════════════════════════════════════════
+//  POLLING DEL SERVIDOR (cada 30s en producción)
+// ════════════════════════════════════════════════════════════
+async function actualizarDesdeServidor() {
+  try {
+    const res = await fetch(`${API_BASE}/collares`);
+    if (!res.ok) return;
+    const collares = await res.json();
+    collares.forEach(c => {
+      const a = animales.find(x => x.collar === c.device);
+      if (a) {
+        a.lat = c.lat; a.lng = c.lng; a.estado = c.estado;
+        if (c.shock_pwr) a.shock_pwr = c.shock_pwr;
+      }
+    });
+    renderAnimales(); renderLotes();
+  } catch(e) { /* offline, usa datos demo */ }
+}
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+renderLotes();
+renderAnimales();
+renderAnimalesList();
+renderCercas();
+// Activar polling cada 30s cuando haya servidor real
+// Polling activado: consulta el servidor cada 30s y una vez al cargar
+actualizarDesdeServidor();
+setInterval(actualizarDesdeServidor, 30000);
+</script>
+</body>
+</html>
