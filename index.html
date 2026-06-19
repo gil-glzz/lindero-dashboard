@@ -325,9 +325,9 @@
         🔔
         <span id="alerta-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; font-size:10px; font-weight:700; min-width:18px; height:18px; border-radius:9px; align-items:center; justify-content:center; padding:0 4px;">0</span>
       </button>
-      <div id="alertas-panel" style="display:none; position:absolute; top:48px; right:0; width:320px; max-width:90vw; max-height:400px; overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); z-index:3000;">
-        <div style="padding:12px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:14px;">Alertas recientes</div>
-        <div id="alertas-list"></div>
+      <div id="alertas-panel" style="display:none; position:absolute; top:48px; right:0; width:320px; max-width:90vw; max-height:400px; overflow-y:auto; background:#141d16; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.7); z-index:3000;">
+        <div style="padding:12px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:14px; background:#1a2519; border-radius:12px 12px 0 0;">Alertas recientes</div>
+        <div id="alertas-list" style="background:#141d16;"></div>
       </div>
     </div>
     <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto; padding:6px 14px; font-size:12px; margin-left:8px;">Salir</button>
@@ -730,7 +730,7 @@ async function listarCuentas() {
       const cuentas = await res.json();
       const cont = document.getElementById('lista-cuentas');
       cont.innerHTML = cuentas.length
-        ? cuentas.map(u => `<div style="padding:10px 12px; background:var(--surface); border-radius:8px; margin-bottom:6px;"><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>`).join('')
+        ? cuentas.map(u => `<div style="padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;"><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>`).join('')
         : '<p style="color:var(--text-dim)">No hay cuentas aún.</p>';
     }
   } catch(e) {}
@@ -1340,7 +1340,7 @@ function mostrarAvisoRecorrido(nombre) {
   if (!aviso) {
     aviso = document.createElement('div');
     aviso.id = 'aviso-recorrido';
-    aviso.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:10px 18px; z-index:2500; display:flex; align-items:center; gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.4); font-size:13px;';
+    aviso.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--border); border-radius:24px; padding:10px 18px; z-index:2500; display:flex; align-items:center; gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.4); font-size:13px;';
     document.body.appendChild(aviso);
   }
   aviso.innerHTML = `<span>📍 Recorrido de <strong>${nombre}</strong></span>
