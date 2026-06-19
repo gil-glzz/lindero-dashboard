@@ -284,14 +284,14 @@
       <div id="pane-lotes">
         <p class="sec-title">Lotes de ganado</p>
         <div id="lotes-list"></div>
-        <button class="btn" onclick="showTab('nuevolote')" style="margin-top:8px">
+        <button class="btn" onclick="abrirNuevoLote()" style="margin-top:8px">
           + Agregar lote
         </button>
       </div>
 
-      <!-- NUEVO LOTE -->
+      <!-- NUEVO / EDITAR LOTE -->
       <div id="pane-nuevolote" style="display:none">
-        <p class="sec-title">Nuevo lote</p>
+        <p class="sec-title" id="lote-form-title">Nuevo lote</p>
         <div class="field">
           <label>Nombre del lote</label>
           <input id="lote-nombre" placeholder="Ej: Becerros zona alta"/>
@@ -300,7 +300,8 @@
           <label>Color identificador</label>
           <div class="color-picker" id="lote-colors"></div>
         </div>
-        <button class="btn btn-primary" onclick="crearLote()">Crear lote</button>
+        <button class="btn btn-primary" id="lote-save-btn" onclick="guardarLote()">Crear lote</button>
+        <button class="btn" id="lote-del-btn" onclick="borrarLoteActual()" style="margin-top:8px; display:none; border-color:var(--danger); color:var(--danger)">Borrar lote</button>
         <button class="btn btn-ghost" onclick="showTab('lotes')" style="margin-top:8px">Cancelar</button>
       </div>
 
@@ -466,6 +467,7 @@ let animales = [
 let cercas = [];
 let selectedLote = null;
 let editingAnimalId = null;
+let editingLoteId = null;
 let drawingMode = false;
 let currentPolyPts = [];
 let tempPolyline = null;
@@ -718,33 +720,63 @@ function renderLotes() {
   refreshCercaLoteSelect();
 }
 
-// Editar un lote: cambiar nombre, color o borrarlo
+// Abrir el formulario para EDITAR un lote (mismo panel que crear)
 function abrirEditarLote(id) {
   const l = lotes.find(x => x.id === id);
   if (!l) return;
-  const nuevoNombre = prompt('Nombre del lote:', l.nombre);
-  if (nuevoNombre === null) return;   // canceló
-  if (nuevoNombre.trim()) l.nombre = nuevoNombre.trim();
-
-  // Elegir color de la paleta
-  const colorIdx = prompt(
-    'Color del lote (escribe un número):\n' +
-    PALETA.map((c,i)=> (i+1)+') '+c).join('\n') +
-    '\n\nO deja vacío para no cambiar.', '');
-  if (colorIdx && PALETA[parseInt(colorIdx)-1]) {
-    l.color = PALETA[parseInt(colorIdx)-1];
-  }
-
-  renderLotes();
-  renderAnimales();
+  editingLoteId = id;
+  document.getElementById('lote-form-title').textContent = 'Editar lote';
+  document.getElementById('lote-nombre').value = l.nombre;
+  document.getElementById('lote-save-btn').textContent = 'Guardar cambios';
+  document.getElementById('lote-del-btn').style.display = 'flex';
+  // marcar el color actual como activo
+  document.querySelectorAll('#lote-colors .color-opt').forEach(x => {
+    x.classList.toggle('active', x.dataset.c === l.color);
+  });
+  showTab('nuevolote');
 }
 
-// Borrar lote (con confirmación; los animales quedan sin lote)
-function borrarLote(id) {
+// Abrir el formulario para CREAR un lote nuevo
+function abrirNuevoLote() {
+  editingLoteId = null;
+  document.getElementById('lote-form-title').textContent = 'Nuevo lote';
+  document.getElementById('lote-nombre').value = '';
+  document.getElementById('lote-save-btn').textContent = 'Crear lote';
+  document.getElementById('lote-del-btn').style.display = 'none';
+  // primer color activo por defecto
+  document.querySelectorAll('#lote-colors .color-opt').forEach((x,i) => {
+    x.classList.toggle('active', i === 0);
+  });
+  showTab('nuevolote');
+}
+
+// Guardar: crea uno nuevo o actualiza el que se está editando
+function guardarLote() {
+  const nombre = document.getElementById('lote-nombre').value.trim();
+  if (!nombre) { alert('Ponle nombre al lote'); return; }
+  const color = document.querySelector('#lote-colors .color-opt.active')?.dataset.c
+              || PALETA[lotes.length % PALETA.length];
+  if (editingLoteId) {
+    const l = lotes.find(x => x.id === editingLoteId);
+    if (l) { l.nombre = nombre; l.color = color; }
+  } else {
+    lotes.push({ id: Date.now(), nombre, color });
+  }
+  editingLoteId = null;
+  renderLotes();
+  renderAnimales();
+  showTab('lotes');
+}
+
+// Borrar el lote que se está editando
+function borrarLoteActual() {
+  if (!editingLoteId) return;
   if (lotes.length <= 1) { alert('Debe quedar al menos un lote.'); return; }
   if (!confirm('¿Borrar este lote? Los animales quedarán sin asignar.')) return;
-  lotes = lotes.filter(l => l.id !== id);
+  lotes = lotes.filter(l => l.id !== editingLoteId);
+  editingLoteId = null;
   renderLotes();
+  showTab('lotes');
 }
 
 function selectLote(id) {
@@ -756,16 +788,6 @@ function selectLote(id) {
     const bounds = L.latLngBounds(lAnimales.map(a => [a.lat, a.lng]));
     map.fitBounds(bounds.pad(0.3));
   }
-}
-
-function crearLote() {
-  const nombre = document.getElementById('lote-nombre').value;
-  if (!nombre) { alert('Ponle nombre al lote'); return; }
-  const color = document.querySelector('.color-opt.active')?.dataset.c || PALETA[lotes.length % PALETA.length];
-  lotes.push({ id: Date.now(), nombre, color });
-  document.getElementById('lote-nombre').value = '';
-  renderLotes();
-  showTab('lotes');
 }
 
 function refreshCercaLoteSelect() {
