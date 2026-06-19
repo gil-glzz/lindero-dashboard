@@ -274,7 +274,6 @@
     </div>
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" onclick="showTab('lotes')">Lotes</button>
-      <button class="sidebar-tab" onclick="showTab('cerca')">Nueva cerca</button>
       <button class="sidebar-tab" onclick="showTab('cercas')">Cercas</button>
       <button class="sidebar-tab" onclick="showTab('animales')">Animales</button>
     </div>
@@ -344,13 +343,16 @@
         <button class="btn" id="btn-save-cerca" onclick="guardarCercaActual()" style="margin-top:12px; display:none">
           Guardar cerca
         </button>
+        <button class="btn btn-ghost" onclick="cancelarNuevaCerca()" style="margin-top:8px">
+          Cancelar
+        </button>
       </div>
 
       <!-- CERCAS GUARDADAS -->
       <div id="pane-cercas" style="display:none">
         <p class="sec-title">Cercas guardadas</p>
         <div id="cercas-list"></div>
-        <button class="btn" onclick="showTab('cerca')" style="margin-top:8px">
+        <button class="btn" onclick="abrirNuevaCerca()" style="margin-top:8px">
           + Nueva cerca
         </button>
       </div>
@@ -689,11 +691,47 @@ function guardarCercaActual() {
   renderCercas();
   document.getElementById('btn-save-cerca').style.display = 'none';
 
-  // POST al servidor (comentado para demo offline)
-  // postCerca(cerca);
   enviarCercaAlServidor(cerca);
 
-  showTab('lotes');
+  showTab('cercas');
+}
+
+// Cancelar el dibujo de una cerca nueva y volver a la lista
+// Abrir el dibujo de una cerca nueva con el formulario limpio
+function abrirNuevaCerca() {
+  document.getElementById('cerca-nombre').value = '';
+  document.getElementById('cerca-warn').value = 12;
+  document.getElementById('cerca-tipo').value = 'permanente';
+  if (typeof toggleHoras === 'function') toggleHoras();
+  refreshCercaLoteSelect();
+  // limpiar cualquier dibujo previo
+  drawingMode = false;
+  tempMarkers.forEach(m => map.removeLayer(m));
+  tempMarkers = [];
+  if (tempPolyline) { map.removeLayer(tempPolyline); tempPolyline = null; }
+  currentPolyPts = [];
+  document.getElementById('btn-cerrar-poly').style.display = 'none';
+  document.getElementById('btn-save-cerca').style.display = 'none';
+  document.getElementById('btn-draw-toggle').textContent = 'Empezar a dibujar';
+  document.getElementById('btn-draw-toggle').classList.add('btn-primary');
+  showTab('cerca');
+}
+
+function cancelarNuevaCerca() {
+  // Si estaba dibujando, apagar el modo
+  drawingMode = false;
+  map.getContainer().style.cursor = '';
+  if (map.doubleClickZoom) map.doubleClickZoom.enable();
+  // Limpiar dibujo temporal
+  tempMarkers.forEach(m => map.removeLayer(m));
+  tempMarkers = [];
+  if (tempPolyline) { map.removeLayer(tempPolyline); tempPolyline = null; }
+  currentPolyPts = [];
+  document.getElementById('btn-cerrar-poly').style.display = 'none';
+  document.getElementById('btn-save-cerca').style.display = 'none';
+  document.getElementById('btn-draw-toggle').textContent = 'Empezar a dibujar';
+  document.getElementById('btn-draw-toggle').classList.add('btn-primary');
+  showTab('cercas');
 }
 
 async function enviarCercaAlServidor(cerca) {
@@ -973,7 +1011,14 @@ function showTab(t) {
     if (el) el.style.display = (p===t) ? 'block' : 'none';
   });
   document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
-  const tabMap = { lotes:0, cerca:1, cercas:2, animales:3 };
+  // 3 pestañas: Lotes(0), Cercas(1), Animales(2).
+  // Los sub-paneles resaltan su pestaña padre:
+  //   nuevolote → Lotes ; cerca/editcerca → Cercas
+  const tabMap = {
+    lotes: 0, nuevolote: 0,
+    cercas: 1, cerca: 1, editcerca: 1,
+    animales: 2
+  };
   if (tabMap[t] !== undefined) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
   }
@@ -1077,7 +1122,7 @@ function renderCercasList() {
   const cont = document.getElementById('cercas-list');
   if (!cont) return;
   if (!cercas.length) {
-    cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:16px 0;">No hay cercas guardadas. Dibuja una en "Nueva cerca".</p>';
+    cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:16px 0;">No hay cercas guardadas. Toca "+ Nueva cerca" para crear una.</p>';
     return;
   }
   cont.innerHTML = cercas.map(c => {
