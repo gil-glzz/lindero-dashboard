@@ -181,9 +181,71 @@
   .scroll-thin::-webkit-scrollbar { width: 6px; }
   .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  @media (max-width: 720px) {
-    .sidebar { width: 100%; position: absolute; z-index: 1500; height: 60%; bottom: 0; top: auto; border-right: none; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; }
-    .header-stats { display: none; }
+  /* Tirador para arrastrar el panel en móvil (oculto en desktop) */
+  .sheet-handle { display: none; }
+
+  /* ════════════════════════════════════════════════════════
+     MÓVIL — el mapa ocupa todo; el panel es una hoja
+     deslizable desde abajo (bottom sheet), como Google Maps.
+     ════════════════════════════════════════════════════════ */
+  @media (max-width: 820px) {
+    .main { position: relative; }
+
+    #map {
+      position: absolute; inset: 0;
+      width: 100%; height: 100% !important;
+    }
+
+    .sidebar {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      width: 100%;
+      height: 80vh;
+      transform: translateY(calc(100% - 130px));  /* asomado: se ve la pestaña + un poco */
+      transition: transform .28s cubic-bezier(.4,0,.2,1);
+      border-right: none;
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -8px 30px rgba(0,0,0,.5);
+      z-index: 1500;
+    }
+    .sidebar.abierto {
+      transform: translateY(0);   /* panel arriba, completo */
+    }
+
+    /* Tirador visible para arrastrar/tocar */
+    .sheet-handle {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 0 4px; cursor: grab; flex-shrink: 0;
+      user-select: none;
+    }
+    .sheet-handle::before {
+      content: ''; width: 40px; height: 4px; border-radius: 3px;
+      background: var(--border);
+    }
+    .sheet-handle .sheet-hint {
+      font-size: 10px; color: var(--text-dim); margin-top: 6px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    .sidebar-content { -webkit-overflow-scrolling: touch; }
+
+    /* Header más compacto en móvil */
+    header { padding: 10px 14px; }
+    .logo h1 { font-size: 17px; }
+    .header-stats { display: flex; gap: 14px; }
+    .hstat .num { font-size: 15px; }
+    .hstat .lbl { font-size: 9px; }
+
+    /* Controles del mapa más arriba para no chocar con el panel */
+    .map-controls { top: 10px; right: 10px; }
+    .map-btn { padding: 9px 13px; font-size: 13px; }
+
+    /* Áreas táctiles más grandes en móvil */
+    .sidebar-tab { padding: 14px 8px; font-size: 13px; }
+    .btn { padding: 12px 14px; font-size: 14px; }
+    .field input, .field select, .field textarea { padding: 12px; font-size: 16px; }
+    /* font-size 16px evita que iOS haga zoom al enfocar un input */
   }
 </style>
 </head>
@@ -206,7 +268,10 @@
 </header>
 
 <div class="main">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
+    <div class="sheet-handle" id="sheet-handle">
+      <div class="sheet-hint" id="sheet-hint">Desliza para ver ▲</div>
+    </div>
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" onclick="showTab('lotes')">Lotes</button>
       <button class="sidebar-tab" onclick="showTab('cerca')">Nueva cerca</button>
@@ -306,6 +371,7 @@
     <div class="map-controls">
       <button class="map-btn active" id="layer-sat" onclick="setLayer('sat')">Satélite</button>
       <button class="map-btn" id="layer-terr" onclick="setLayer('terr')">Terreno</button>
+      <button class="map-btn" id="btn-cambiar-sat" onclick="cambiarSatelite()" title="Cambiar proveedor de satélite si no carga">⟳ Otro satélite</button>
     </div>
   </div>
 </div>
@@ -402,37 +468,34 @@ let tempMarkers = [];
 const map = L.map('map', { zoomControl: false }).setView(CENTRO, ZOOM);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Proveedores satelitales — con fallback automático si uno falla
-const SAT_PROVIDERS = [
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-];
-let satProviderIdx = 0;
-let satErrorCount = 0;
+// Proveedores satelitales — el usuario puede alternar si uno no carga bien
+const SAT_PROVIDERS = {
+  esri: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    opts: { attribution: 'Esri', maxZoom: 19, maxNativeZoom: 18 }
+  },
+  google: {
+    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    opts: { attribution: 'Google', maxZoom: 21, subdomains: ['0','1','2','3'] }
+  }
+};
+let satProviderActual = 'esri';
+let satLayer = L.tileLayer(SAT_PROVIDERS.esri.url, SAT_PROVIDERS.esri.opts);
 
-function makeSatLayer(idx) {
-  const layer = L.tileLayer(SAT_PROVIDERS[idx], {
-    attribution: 'Mapa', maxZoom: 19, crossOrigin: true
-  });
-  layer.on('tileerror', () => {
-    satErrorCount++;
-    if (satErrorCount > 3 && satProviderIdx < SAT_PROVIDERS.length - 1) {
-      satErrorCount = 0;
-      satProviderIdx++;
-      map.removeLayer(satLayer);
-      satLayer = makeSatLayer(satProviderIdx);
-      satLayer.addTo(map);
-    }
-  });
-  return layer;
-}
-
-let satLayer = makeSatLayer(0);
 const terrLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: 'OpenStreetMap', maxZoom: 19
 });
 satLayer.addTo(map);
+
+// Cambiar entre proveedores de satélite (Esri ↔ Google)
+function cambiarSatelite() {
+  map.removeLayer(satLayer);
+  satProviderActual = (satProviderActual === 'esri') ? 'google' : 'esri';
+  const p = SAT_PROVIDERS[satProviderActual];
+  satLayer = L.tileLayer(p.url, p.opts);
+  satLayer.addTo(map);
+  setTimeout(fixMapSize, 100);
+}
 
 // invalidateSize robusto: corrige el "mapa negro" en contenedores flex.
 // Se llama varias veces porque el layout puede estabilizarse tarde.
@@ -936,6 +999,43 @@ renderCercas();
 // Polling activado: consulta el servidor cada 30s y una vez al cargar
 actualizarDesdeServidor();
 setInterval(actualizarDesdeServidor, 5000);
+
+// ════════════════════════════════════════════════════════════
+//  BOTTOM SHEET MÓVIL — abrir/cerrar el panel deslizable
+// ════════════════════════════════════════════════════════════
+(function() {
+  const sidebar = document.getElementById('sidebar');
+  const handle = document.getElementById('sheet-handle');
+  const hint = document.getElementById('sheet-hint');
+  if (!sidebar || !handle) return;
+
+  function abrir()  { sidebar.classList.add('abierto');    if(hint) hint.textContent = 'Desliza para ocultar ▼'; setTimeout(()=>{ if(typeof fixMapSize==='function') fixMapSize(); }, 320); }
+  function cerrar() { sidebar.classList.remove('abierto'); if(hint) hint.textContent = 'Desliza para ver ▲'; setTimeout(()=>{ if(typeof fixMapSize==='function') fixMapSize(); }, 320); }
+  function toggle() { sidebar.classList.contains('abierto') ? cerrar() : abrir(); }
+
+  // Tocar el tirador alterna abierto/cerrado
+  handle.addEventListener('click', toggle);
+
+  // Arrastrar el tirador (gesto natural en móvil)
+  let startY = 0, dragging = false;
+  handle.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY; dragging = true;
+  }, { passive: true });
+  handle.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy < -30) { abrir(); dragging = false; }   // arrastró hacia arriba
+    if (dy > 30)  { cerrar(); dragging = false; }   // arrastró hacia abajo
+  }, { passive: true });
+  handle.addEventListener('touchend', () => { dragging = false; });
+
+  // Al cambiar de pestaña en móvil, abrir el panel para ver el contenido
+  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (window.innerWidth <= 820) abrir();
+    });
+  });
+})();
 </script>
 </body>
 </html>
