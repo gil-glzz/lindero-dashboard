@@ -251,12 +251,68 @@
 </head>
 <body>
 
+<!-- PANTALLA DE LOGIN -->
+<div id="login-screen" style="position:fixed; inset:0; z-index:5000; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px;">
+  <div style="width:100%; max-width:380px;">
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="width:64px; height:64px; border-radius:16px; background:var(--accent); color:#08311c; font-size:32px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">L</div>
+      <h1 style="font-size:26px; margin:0;">Lindero</h1>
+      <p style="color:var(--text-dim); font-size:14px; margin-top:4px;">Cercas digitales para ganado</p>
+    </div>
+    <div class="field">
+      <label>Correo</label>
+      <input id="login-correo" type="email" placeholder="tu@correo.com" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn btn-primary" onclick="hacerLogin()" style="width:100%; margin-top:8px;">Entrar</button>
+    <p id="login-error" style="color:var(--danger); font-size:13px; text-align:center; margin-top:12px; display:none;"></p>
+    <p style="text-align:center; margin-top:24px;">
+      <a onclick="abrirAdmin()" style="color:var(--text-dim); font-size:12px; cursor:pointer; text-decoration:underline;">Administración</a>
+    </p>
+  </div>
+</div>
+
+<!-- PANTALLA DE ADMIN (crear cuentas y asignar collares) -->
+<div id="admin-screen" style="position:fixed; inset:0; z-index:5001; background:var(--bg); display:none; overflow-y:auto; padding:20px;">
+  <div style="width:100%; max-width:520px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0 24px;">
+      <h1 style="font-size:22px; margin:0;">Administración</h1>
+      <button class="btn btn-ghost" onclick="cerrarAdmin()" style="width:auto; padding:8px 16px;">Salir</button>
+    </div>
+
+    <div class="field">
+      <label>Contraseña de administrador</label>
+      <input id="admin-pass" type="password" placeholder="Tu contraseña de admin"/>
+      <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">Necesaria para crear cuentas y asignar collares.</p>
+    </div>
+
+    <p class="sec-title" style="margin-top:24px;">Crear cuenta de rancho</p>
+    <div class="field"><label>Correo del ranchero</label><input id="nuevo-correo" type="email" placeholder="rancho@correo.com"/></div>
+    <div class="field"><label>Contraseña para el ranchero</label><input id="nuevo-pass" type="text" placeholder="clave que le darás"/></div>
+    <div class="field"><label>Nombre del rancho</label><input id="nuevo-rancho" type="text" placeholder="Rancho El Roble"/></div>
+    <button class="btn btn-primary" onclick="crearCuenta()" style="width:100%;">Crear cuenta</button>
+    <p id="admin-msg" style="font-size:13px; text-align:center; margin-top:12px; display:none;"></p>
+
+    <p class="sec-title" style="margin-top:28px;">Asignar collar a un rancho</p>
+    <div class="field"><label>ID del collar (device)</label><input id="asig-device" type="text" placeholder="collar_01"/></div>
+    <div class="field"><label>Correo del rancho dueño</label><input id="asig-dueno" type="email" placeholder="rancho@correo.com"/></div>
+    <button class="btn" onclick="asignarCollar()" style="width:100%;">Asignar collar</button>
+    <p id="asig-msg" style="font-size:13px; text-align:center; margin-top:12px; display:none;"></p>
+
+    <p class="sec-title" style="margin-top:28px;">Cuentas existentes</p>
+    <div id="lista-cuentas" style="font-size:13px;"></div>
+  </div>
+</div>
+
 <header>
   <div class="logo">
     <div class="logo-mark">L</div>
     <div>
       <h1>Lindero</h1>
-      <div class="tag">Cercas digitales</div>
+      <div class="tag" id="header-rancho">Cercas digitales</div>
     </div>
   </div>
   <div class="header-stats">
@@ -264,6 +320,7 @@
     <div class="hstat"><div class="num" id="stat-lotes">0</div><div class="lbl">lotes</div></div>
     <div class="hstat"><div class="num" style="color:var(--accent)" id="stat-dentro">0</div><div class="lbl">dentro</div></div>
     <div class="hstat"><div class="num" style="color:var(--danger)" id="stat-alertas">0</div><div class="lbl">alertas</div></div>
+    <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto; padding:6px 14px; font-size:12px; margin-left:8px;">Salir</button>
   </div>
 </header>
 
@@ -483,6 +540,181 @@
 //  CONFIGURACIÓN
 // ════════════════════════════════════════════════════════════
 const API_BASE = 'https://collar-gps-server.onrender.com'; // cambiar por tu URL de Render
+
+// ════════════════════════════════════════════════════════════
+//  AUTENTICACIÓN
+// ════════════════════════════════════════════════════════════
+let authToken = null;   // token de sesión
+
+// Recuperar sesión guardada al cargar la página
+try {
+  const guardado = localStorage.getItem('lindero_token');
+  const rancho = localStorage.getItem('lindero_rancho');
+  if (guardado) {
+    authToken = guardado;
+    // Se valida al primer fetch; si el token ya no sirve, authFetch manda al login
+    window._ranchoGuardado = rancho;
+  }
+} catch(e) { /* localStorage no disponible */ }
+
+// fetch que incluye el token automáticamente.
+// Si el servidor responde 401 (sesión inválida/expirada), regresa al login.
+async function authFetch(url, options = {}) {
+  const headers = options.headers || {};
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401 && authToken) {
+    // El token dejó de ser válido (p.ej. cambió la contraseña de admin)
+    authToken = null;
+    const errEl = document.getElementById('login-error');
+    if (errEl) {
+      errEl.textContent = 'Tu sesión expiró. Inicia sesión de nuevo.';
+      errEl.style.display = 'block';
+    }
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+  return res;
+}
+
+async function hacerLogin() {
+  const correo = document.getElementById('login-correo').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!correo || !password) { errEl.textContent = 'Escribe tu correo y contraseña'; errEl.style.display = 'block'; return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correo, password })
+    });
+    const data = await res.json();
+    if (res.ok && data.token) {
+      authToken = data.token;
+      try {
+        localStorage.setItem('lindero_token', data.token);
+        localStorage.setItem('lindero_rancho', data.rancho);
+      } catch(e) {}
+      document.getElementById('header-rancho').textContent = data.rancho;
+      document.getElementById('login-screen').style.display = 'none';
+      perfilesYaCargados = false;
+      actualizarDesdeServidor();
+      setTimeout(fixMapSize, 200);
+    } else {
+      errEl.textContent = data.error || 'Correo o contraseña incorrectos';
+      errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = 'No se pudo conectar. Intenta de nuevo.';
+    errEl.style.display = 'block';
+  }
+}
+
+function cerrarSesion() {
+  authToken = null;
+  try {
+    localStorage.removeItem('lindero_token');
+    localStorage.removeItem('lindero_rancho');
+  } catch(e) {}
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-password').value = '';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('login-screen') &&
+      document.getElementById('login-screen').style.display !== 'none') {
+    hacerLogin();
+  }
+});
+
+function abrirAdmin() {
+  document.getElementById('admin-screen').style.display = 'block';
+  const pass = document.getElementById('admin-pass');
+  pass.oninput = () => { if (pass.value.length > 4) listarCuentas(); };
+}
+function cerrarAdmin() { document.getElementById('admin-screen').style.display = 'none'; }
+
+async function crearCuenta() {
+  const adminPass = document.getElementById('admin-pass').value;
+  const correo = document.getElementById('nuevo-correo').value.trim();
+  const password = document.getElementById('nuevo-pass').value;
+  const rancho = document.getElementById('nuevo-rancho').value.trim();
+  const msg = document.getElementById('admin-msg');
+  if (!adminPass || !correo || !password || !rancho) {
+    msg.textContent = 'Llena todos los campos (incluida la contraseña de admin)';
+    msg.style.color = 'var(--danger)'; msg.style.display = 'block'; return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/admin/usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+      body: JSON.stringify({ correo, password, rancho })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = '✅ Cuenta creada: ' + rancho;
+      msg.style.color = 'var(--accent)';
+      document.getElementById('nuevo-correo').value = '';
+      document.getElementById('nuevo-pass').value = '';
+      document.getElementById('nuevo-rancho').value = '';
+      listarCuentas();
+    } else {
+      msg.textContent = '⚠ ' + (data.error || 'No se pudo crear');
+      msg.style.color = 'var(--danger)';
+    }
+    msg.style.display = 'block';
+  } catch(e) {
+    msg.textContent = 'Error de conexión'; msg.style.color = 'var(--danger)'; msg.style.display = 'block';
+  }
+}
+
+async function asignarCollar() {
+  const adminPass = document.getElementById('admin-pass').value;
+  const device = document.getElementById('asig-device').value.trim();
+  const dueno = document.getElementById('asig-dueno').value.trim();
+  const msg = document.getElementById('asig-msg');
+  if (!adminPass || !device || !dueno) {
+    msg.textContent = 'Llena el ID del collar, el correo y la contraseña de admin';
+    msg.style.color = 'var(--danger)'; msg.style.display = 'block'; return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/admin/asignar-collar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+      body: JSON.stringify({ device, dueno })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = '✅ Collar ' + device + ' asignado a ' + dueno;
+      msg.style.color = 'var(--accent)';
+      document.getElementById('asig-device').value = '';
+      document.getElementById('asig-dueno').value = '';
+    } else {
+      msg.textContent = '⚠ ' + (data.error || 'No se pudo asignar');
+      msg.style.color = 'var(--danger)';
+    }
+    msg.style.display = 'block';
+  } catch(e) {
+    msg.textContent = 'Error de conexión'; msg.style.color = 'var(--danger)'; msg.style.display = 'block';
+  }
+}
+
+async function listarCuentas() {
+  const adminPass = document.getElementById('admin-pass').value;
+  if (!adminPass) return;
+  try {
+    const res = await fetch(`${API_BASE}/admin/usuarios`, {
+      headers: { 'x-admin-password': adminPass }
+    });
+    if (res.ok) {
+      const cuentas = await res.json();
+      const cont = document.getElementById('lista-cuentas');
+      cont.innerHTML = cuentas.length
+        ? cuentas.map(u => `<div style="padding:10px 12px; background:var(--surface); border-radius:8px; margin-bottom:6px;"><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>`).join('')
+        : '<p style="color:var(--text-dim)">No hay cuentas aún.</p>';
+    }
+  } catch(e) {}
+}
 
 const PALETA = ['#4ade80','#f87171','#fbbf24','#60a5fa','#c084fc','#fb923c','#2dd4bf','#f472b6'];
 
@@ -742,7 +974,7 @@ async function enviarCercaAlServidor(cerca) {
     ...(cerca.tipo === 'temporal' ? { horas: Math.round((cerca.expiraEn - Date.now())/3600000) } : {})
   };
   try {
-    const res = await fetch(`${API_BASE}/geovallas`, {
+    const res = await authFetch(`${API_BASE}/geovallas`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
@@ -827,16 +1059,29 @@ function guardarLote() {
   if (!nombre) { alert('Ponle nombre al lote'); return; }
   const color = document.querySelector('#lote-colors .color-opt.active')?.dataset.c
               || PALETA[lotes.length % PALETA.length];
+  let lote;
   if (editingLoteId) {
-    const l = lotes.find(x => x.id === editingLoteId);
-    if (l) { l.nombre = nombre; l.color = color; }
+    lote = lotes.find(x => x.id === editingLoteId);
+    if (lote) { lote.nombre = nombre; lote.color = color; }
   } else {
-    lotes.push({ id: Date.now(), nombre, color });
+    lote = { id: Date.now(), nombre, color };
+    lotes.push(lote);
   }
   editingLoteId = null;
   renderLotes();
   renderAnimales();
   showTab('lotes');
+  if (lote) guardarLoteEnServidor(lote);
+}
+
+// Guardar (o actualizar) un lote en el servidor
+async function guardarLoteEnServidor(l) {
+  try {
+    await authFetch(`${API_BASE}/lotes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: l.id, nombre: l.nombre, color: l.color })
+    });
+  } catch(e) { console.error('No se pudo guardar el lote en el servidor', e); }
 }
 
 // Borrar el lote que se está editando
@@ -844,10 +1089,13 @@ function borrarLoteActual() {
   if (!editingLoteId) return;
   if (lotes.length <= 1) { alert('Debe quedar al menos un lote.'); return; }
   if (!confirm('¿Borrar este lote? Los animales quedarán sin asignar.')) return;
-  lotes = lotes.filter(l => l.id !== editingLoteId);
+  const idBorrar = editingLoteId;
+  lotes = lotes.filter(l => l.id !== idBorrar);
   editingLoteId = null;
   renderLotes();
   showTab('lotes');
+  // borrar en el servidor
+  authFetch(`${API_BASE}/lotes/${idBorrar}`, { method: 'DELETE' }).catch(()=>{});
 }
 
 function selectLote(id) {
@@ -979,21 +1227,38 @@ function guardarAnimal() {
     lote: parseInt(document.getElementById('ed-lote').value),
     notas: document.getElementById('ed-notas').value
   };
+  let animal;
   if (editingAnimalId) {
-    const a = animales.find(x => x.id === editingAnimalId);
-    Object.assign(a, datos);
+    animal = animales.find(x => x.id === editingAnimalId);
+    Object.assign(animal, datos);
   } else {
-    animales.push({
+    animal = {
       id: Date.now(), ...datos,
       estado:'ok', actividad:0, bateria:100,
       lat: CENTRO[0] + (Math.random()-.5)*0.01,
       lng: CENTRO[1] + (Math.random()-.5)*0.01
-    });
+    };
+    animales.push(animal);
   }
   renderAnimales();
   renderAnimalesList();
   renderLotes();
   cerrarModal();
+  guardarAnimalEnServidor(animal);   // persistir
+}
+
+// Guardar (o actualizar) un animal en el servidor
+async function guardarAnimalEnServidor(a) {
+  try {
+    await authFetch(`${API_BASE}/animales`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: a.id, nombre: a.nombre, collar: a.collar, arete: a.arete,
+        peso: a.peso, edad: a.edad, raza: a.raza, sexo: a.sexo,
+        lote: a.lote, notas: a.notas
+      })
+    });
+  } catch(e) { console.error('No se pudo guardar el animal en el servidor', e); }
 }
 
 function cancelarEdit() {
@@ -1055,10 +1320,48 @@ PALETA.forEach((c,i) => {
 // ════════════════════════════════════════════════════════════
 //  POLLING DEL SERVIDOR (cada 30s en producción)
 // ════════════════════════════════════════════════════════════
-async function actualizarDesdeServidor() {
-  // 1. Posiciones de los collares
+let perfilesYaCargados = false;
+
+async function cargarPerfilesIniciales() {
+  // Cargar lotes guardados
   try {
-    const res = await fetch(`${API_BASE}/collares`);
+    const res = await authFetch(`${API_BASE}/lotes`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length) {
+        lotes = data.map(l => ({ id: Number(l.id), nombre: l.nombre, color: l.color }));
+      }
+    }
+  } catch(e) { /* sin conexión, usa los de memoria */ }
+
+  // Cargar animales guardados
+  try {
+    const res = await authFetch(`${API_BASE}/animales`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length) {
+        animales = data.map(a => ({
+          id: Number(a.id), nombre: a.nombre, collar: a.collar, arete: a.arete,
+          peso: a.peso, edad: a.edad, raza: a.raza, sexo: a.sexo,
+          lote: a.lote ? Number(a.lote) : null, notas: a.notas,
+          estado: 'ok', actividad: 0, bateria: 100,
+          lat: CENTRO[0], lng: CENTRO[1]
+        }));
+      }
+    }
+  } catch(e) { /* sin conexión */ }
+
+  perfilesYaCargados = true;
+  renderLotes(); renderAnimales(); renderAnimalesList();
+}
+
+async function actualizarDesdeServidor() {
+  // La primera vez, cargar perfiles guardados (lotes y animales)
+  if (!perfilesYaCargados) await cargarPerfilesIniciales();
+
+  // 1. Posiciones de los collares (datos en vivo sobre los perfiles)
+  try {
+    const res = await authFetch(`${API_BASE}/collares`);
     if (res.ok) {
       const collares = await res.json();
       collares.forEach(c => {
@@ -1066,7 +1369,6 @@ async function actualizarDesdeServidor() {
         if (a) {
           a.lat = c.lat; a.lng = c.lng; a.estado = c.estado;
           if (c.shock_pwr) a.shock_pwr = c.shock_pwr;
-          // Datos en vivo
           a.ultimaConexion = c.ts ? new Date(c.ts).getTime() : Date.now();
           if (c.dist_borde != null) a.distBorde = c.dist_borde;
           if (c.sats != null)       a.sats = c.sats;
@@ -1080,7 +1382,7 @@ async function actualizarDesdeServidor() {
 
   // 2. Cercas guardadas en el servidor
   try {
-    const res = await fetch(`${API_BASE}/geovallas`);
+    const res = await authFetch(`${API_BASE}/geovallas`);
     if (res.ok) {
       const data = await res.json();
       cercas = data.map(g => ({
@@ -1104,7 +1406,7 @@ async function actualizarDesdeServidor() {
 async function borrarCerca(id) {
   if (!confirm('¿Borrar esta cerca? Los collares dejarán de usarla.')) return;
   try {
-    const res = await fetch(`${API_BASE}/geovallas/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_BASE}/geovallas/${id}`, { method: 'DELETE' });
     if (res.ok) {
       cercas = cercas.filter(c => c.id !== id);
       renderCercas();
@@ -1307,7 +1609,7 @@ async function guardarEdicionCerca() {
 
   // Guardar en el servidor
   try {
-    const res = await fetch(`${API_BASE}/geovallas/${c.id}`, {
+    const res = await authFetch(`${API_BASE}/geovallas/${c.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: c.nombre, poligono: c.poligono,
@@ -1345,10 +1647,18 @@ renderLotes();
 renderAnimales();
 renderAnimalesList();
 renderCercas();
-// Activar polling cada 30s cuando haya servidor real
-// Polling activado: consulta el servidor cada 30s y una vez al cargar
-actualizarDesdeServidor();
-setInterval(actualizarDesdeServidor, 5000);
+// El polling solo trae datos cuando ya hay sesión iniciada (authToken).
+setInterval(() => { if (authToken) actualizarDesdeServidor(); }, 5000);
+
+// Si hay una sesión guardada de antes, entrar directo sin pedir login otra vez
+if (authToken) {
+  if (window._ranchoGuardado) {
+    document.getElementById('header-rancho').textContent = window._ranchoGuardado;
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  actualizarDesdeServidor();
+  setTimeout(fixMapSize, 200);
+}
 
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET MÓVIL — abrir/cerrar el panel deslizable
