@@ -320,6 +320,16 @@
     <div class="hstat"><div class="num" id="stat-lotes">0</div><div class="lbl">lotes</div></div>
     <div class="hstat"><div class="num" style="color:var(--accent)" id="stat-dentro">0</div><div class="lbl">dentro</div></div>
     <div class="hstat"><div class="num" style="color:var(--danger)" id="stat-alertas">0</div><div class="lbl">alertas</div></div>
+    <div style="position:relative;">
+      <button onclick="toggleAlertas()" title="Alertas" style="position:relative; background:transparent; border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:16px; margin-left:8px;">
+        🔔
+        <span id="alerta-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; font-size:10px; font-weight:700; min-width:18px; height:18px; border-radius:9px; align-items:center; justify-content:center; padding:0 4px;">0</span>
+      </button>
+      <div id="alertas-panel" style="display:none; position:absolute; top:48px; right:0; width:320px; max-width:90vw; max-height:400px; overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); z-index:3000;">
+        <div style="padding:12px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:14px;">Alertas recientes</div>
+        <div id="alertas-list"></div>
+      </div>
+    </div>
     <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto; padding:6px 14px; font-size:12px; margin-left:8px;">Salir</button>
   </div>
 </header>
@@ -503,6 +513,7 @@
 
       <div class="field"><label>Arete / ID</label><div id="modal-arete" style="font-size:14px">—</div></div>
       <div class="field"><label>Notas sanitarias</label><div id="modal-notas" style="font-size:14px; line-height:1.5">—</div></div>
+      <button class="btn btn-primary" onclick="verRecorrido()" style="margin-top:8px">📍 Ver recorrido en el mapa</button>
       <button class="btn" onclick="editarAnimal()" style="margin-top:8px">Editar perfil</button>
     </div>
 
@@ -624,6 +635,15 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && document.getElementById('login-screen') &&
       document.getElementById('login-screen').style.display !== 'none') {
     hacerLogin();
+  }
+});
+
+// Cerrar el panel de alertas al hacer clic fuera de él
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('alertas-panel');
+  if (!panel || panel.style.display !== 'block') return;
+  if (!panel.contains(e.target) && !e.target.closest('[onclick="toggleAlertas()"]')) {
+    panel.style.display = 'none';
   }
 });
 
@@ -1134,10 +1154,23 @@ function renderAnimalesList() {
         <div class="lote-count" style="background:${stColor}22; color:${stColor}">${a.collar}</div>
       </div>
       <div class="lote-meta">
-        <span>${a.raza}</span><span>${a.peso}kg</span><span>🔋 ${a.bateria}%</span>
+        <span>${a.raza}</span><span>${a.peso}kg</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%</span>
       </div>
     </div>`;
   }).join('');
+}
+
+// Color e icono de batería según nivel
+function bateriaColor(pct) {
+  if (pct == null) return 'var(--text-dim)';
+  if (pct <= 15) return '#f87171';   // crítica - rojo
+  if (pct <= 35) return '#fbbf24';   // baja - amarillo
+  return '#4ade80';                  // ok - verde
+}
+function bateriaIcono(pct) {
+  if (pct == null) return '🔋';
+  if (pct <= 15) return '🪫';        // batería baja
+  return '🔋';
 }
 
 function abrirPerfilAnimal(id) {
@@ -1160,7 +1193,9 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-raza').textContent = a.raza;
   document.getElementById('modal-sexo').textContent = a.sexo;
   document.getElementById('modal-actividad').textContent = a.actividad + ' h';
-  document.getElementById('modal-bateria').textContent = a.bateria + '%';
+  const batEl = document.getElementById('modal-bateria');
+  batEl.textContent = bateriaIcono(a.bateria) + ' ' + a.bateria + '%';
+  batEl.style.color = bateriaColor(a.bateria);
   document.getElementById('modal-arete').textContent = a.arete || '—';
   document.getElementById('modal-notas').textContent = a.notas || 'Sin notas';
 
@@ -1266,6 +1301,58 @@ function cancelarEdit() {
   else cerrarModal();
 }
 function cerrarModal() { document.getElementById('modal-animal').classList.remove('open'); }
+
+// Dibujar el recorrido (rastro) del animal seleccionado
+let recorridoLayer = null;
+async function verRecorrido() {
+  const a = animales.find(x => x.id === editingAnimalId);
+  if (!a) return;
+  cerrarModal();
+  if (recorridoLayer) { map.removeLayer(recorridoLayer); recorridoLayer = null; }
+  try {
+    const res = await authFetch(`${API_BASE}/historial?device=${a.collar}&limit=100`);
+    if (!res.ok) { alert('No se pudo cargar el recorrido'); return; }
+    const puntos = await res.json();
+    if (puntos.length < 2) {
+      alert('Aún no hay suficiente recorrido para ' + a.nombre + '. Se necesitan más posiciones.');
+      return;
+    }
+    const coords = puntos.reverse().map(p => [p.lat, p.lng]);
+    const lote = lotes.find(l => l.id === a.lote);
+    const color = lote ? lote.color : '#4ade80';
+
+    recorridoLayer = L.layerGroup();
+    L.polyline(coords, { color, weight: 3, opacity: 0.7 }).addTo(recorridoLayer);
+    L.circleMarker(coords[0], { radius: 6, color:'#fff', fillColor:'#888', fillOpacity:1, weight:2 })
+      .bindTooltip('Inicio').addTo(recorridoLayer);
+    L.circleMarker(coords[coords.length-1], { radius: 8, color:'#fff', fillColor:color, fillOpacity:1, weight:3 })
+      .bindTooltip(a.nombre + ' (ahora)').addTo(recorridoLayer);
+    recorridoLayer.addTo(map);
+    map.fitBounds(L.latLngBounds(coords).pad(0.2));
+    mostrarAvisoRecorrido(a.nombre);
+  } catch(e) {
+    alert('Error al cargar el recorrido: ' + e.message);
+  }
+}
+
+function mostrarAvisoRecorrido(nombre) {
+  let aviso = document.getElementById('aviso-recorrido');
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.id = 'aviso-recorrido';
+    aviso.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:10px 18px; z-index:2500; display:flex; align-items:center; gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.4); font-size:13px;';
+    document.body.appendChild(aviso);
+  }
+  aviso.innerHTML = `<span>📍 Recorrido de <strong>${nombre}</strong></span>
+    <button onclick="quitarRecorrido()" style="background:var(--danger); color:white; border:none; border-radius:16px; padding:5px 12px; font-size:12px; cursor:pointer;">Quitar</button>`;
+  aviso.style.display = 'flex';
+}
+
+function quitarRecorrido() {
+  if (recorridoLayer) { map.removeLayer(recorridoLayer); recorridoLayer = null; }
+  const aviso = document.getElementById('aviso-recorrido');
+  if (aviso) aviso.style.display = 'none';
+}
 
 // ════════════════════════════════════════════════════════════
 //  TABS Y UTILIDADES
@@ -1400,6 +1487,73 @@ async function actualizarDesdeServidor() {
       renderCercasList();
     }
   } catch(e) { /* sin conexión */ }
+
+  // 3. Alertas (cruces y avisos)
+  try {
+    const res = await authFetch(`${API_BASE}/alertas?limit=30`);
+    if (res.ok) {
+      alertas = await res.json();
+      renderAlertas();
+    }
+  } catch(e) { /* sin conexión */ }
+}
+
+// Render del panel de alertas y el contador de la campana
+let alertas = [];
+function renderAlertas() {
+  const noLeidas = alertas.filter(a => !a.leida).length;
+  const badge = document.getElementById('alerta-badge');
+  if (badge) {
+    badge.textContent = noLeidas;
+    badge.style.display = noLeidas > 0 ? 'flex' : 'none';
+  }
+  const cont = document.getElementById('alertas-list');
+  if (!cont) return;
+  if (!alertas.length) {
+    cont.innerHTML = '<p style="padding:20px; text-align:center; color:var(--text-dim); font-size:13px;">Sin alertas. Todo tranquilo. 🐄</p>';
+    return;
+  }
+  cont.innerHTML = alertas.map(a => {
+    const animal = animales.find(x => x.collar === a.device);
+    const nombre = animal ? animal.nombre : a.device;
+    const esCruce = a.tipo === 'shock';
+    const icono = esCruce ? '🔴' : '🟡';
+    const color = esCruce ? 'var(--danger)' : '#fbbf24';
+    return `<div style="padding:12px 14px; border-bottom:0.5px solid var(--border); ${a.leida?'opacity:.55':''}">
+      <div style="display:flex; gap:8px; align-items:start;">
+        <span>${icono}</span>
+        <div style="flex:1;">
+          <div style="font-size:13px; color:var(--text); line-height:1.4;">
+            <strong>${nombre}</strong> ${esCruce ? 'cruzó la cerca' : 'se acercó al límite'}
+          </div>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">${tiempoRelativo(new Date(a.ts).getTime())}</div>
+        </div>
+        <button onclick="irAAlerta(${a.lat},${a.lng})" style="font-size:10px; padding:4px 8px; border-radius:5px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Ver</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAlertas() {
+  const panel = document.getElementById('alertas-panel');
+  const abierto = panel.style.display === 'block';
+  panel.style.display = abierto ? 'none' : 'block';
+  if (!abierto) marcarAlertasLeidas();
+}
+
+function irAAlerta(lat, lng) {
+  map.setView([lat, lng], 17);
+  document.getElementById('alertas-panel').style.display = 'none';
+}
+
+// Marcar todas como leídas al abrir el panel
+async function marcarAlertasLeidas() {
+  const noLeidas = alertas.filter(a => !a.leida);
+  for (const a of noLeidas) {
+    try { await authFetch(`${API_BASE}/alertas/${a.id}/leer`, { method: 'POST' }); } catch(e) {}
+    a.leida = true;
+  }
+  renderAlertas();
 }
 
 // Borrar una cerca (en el servidor y en el mapa)
