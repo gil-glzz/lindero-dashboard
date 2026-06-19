@@ -382,7 +382,7 @@
           ✎ Editar forma (arrastrar puntos)
         </button>
         <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px; line-height:1.5">
-          Al editar la forma: arrastra los puntos para moverlos. Toca un punto intermedio (más claro) para fijarlo. Para quitar un punto, arrástralo sobre otro.
+          Arrastra los puntos de colores para mover las esquinas. Toca el borde de la cerca para agregar un punto nuevo. Doble clic en un punto para quitarlo.
         </p>
         <button class="btn btn-primary" onclick="guardarEdicionCerca()">Guardar cambios</button>
         <button class="btn btn-ghost" onclick="cancelarEdicionCerca()" style="margin-top:8px">Cancelar</button>
@@ -1145,34 +1145,106 @@ function abrirEditarCerca(id) {
   showTab('editcerca');
 }
 
-// Activar/desactivar el arrastre de vértices con leaflet-draw
+// Activar/desactivar el arrastre de vértices con marcadores arrastrables
+let vertexMarkers = [];   // marcadores en cada esquina
+
 function toggleEditarForma() {
   const c = cercas.find(x => x.id === editingCercaId);
   if (!c) return;
   const btn = document.getElementById('ec-shape-btn');
 
   if (!editandoForma) {
-    // Crear un polígono editable encima del original
+    // Dibujar el polígono base
     editPolyLayer = L.polygon(c.poligono.map(p => [p.lat, p.lng]), {
       color: c.color, weight: 2, fillOpacity: 0.2
     }).addTo(map);
-    editPolyLayer.editing.enable();   // habilita arrastrar/agregar/quitar vértices
-    map.fitBounds(editPolyLayer.getBounds().pad(0.2));
+    map.fitBounds(editPolyLayer.getBounds().pad(0.3));
+
+    // Crear un marcador arrastrable en cada vértice
+    vertexMarkers = [];
+    c.poligono.forEach((p, i) => {
+      const m = L.marker([p.lat, p.lng], {
+        draggable: true,
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="width:18px;height:18px;border-radius:50%;background:'+c.color+';border:3px solid white;box-shadow:0 0 0 2px rgba(0,0,0,.4);"></div>',
+          iconSize: [18, 18], iconAnchor: [9, 9]
+        })
+      }).addTo(map);
+
+      // Al arrastrar, redibujar el polígono en vivo
+      m.on('drag', () => {
+        const pts = vertexMarkers.map(mk => mk.getLatLng());
+        editPolyLayer.setLatLngs(pts);
+      });
+      // Doble clic en un vértice lo elimina (si quedan más de 3)
+      m.on('dblclick', () => {
+        if (vertexMarkers.length <= 3) { alert('La cerca necesita al menos 3 puntos'); return; }
+        map.removeLayer(m);
+        vertexMarkers = vertexMarkers.filter(x => x !== m);
+        editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
+      });
+      vertexMarkers.push(m);
+    });
+
+    // Tocar el borde del polígono agrega un vértice nuevo ahí
+    editPolyLayer.on('click', (e) => {
+      agregarVerticeEn(e.latlng, c.color);
+    });
+
     editandoForma = true;
     btn.textContent = '✓ Terminar de editar forma';
     btn.classList.add('btn-primary');
   } else {
-    // Tomar los puntos editados y guardarlos en memoria
-    const latlngs = editPolyLayer.getLatLngs()[0];
-    c.poligono = latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }));
-    editPolyLayer.editing.disable();
-    map.removeLayer(editPolyLayer);
-    editPolyLayer = null;
-    editandoForma = false;
+    capturarForma(c);
     btn.textContent = '✎ Editar forma (arrastrar puntos)';
     btn.classList.remove('btn-primary');
-    renderCercas();   // redibujar con la nueva forma
+    renderCercas();
   }
+}
+
+// Insertar un vértice nuevo en el punto más cercano del borde
+function agregarVerticeEn(latlng, color) {
+  // Encontrar entre qué dos vértices insertar (el segmento más cercano)
+  const pts = vertexMarkers.map(m => m.getLatLng());
+  let mejorIdx = 0, mejorDist = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i+1) % pts.length];
+    const mid = L.latLng((a.lat+b.lat)/2, (a.lng+b.lng)/2);
+    const d = latlng.distanceTo(mid);
+    if (d < mejorDist) { mejorDist = d; mejorIdx = i + 1; }
+  }
+  const m = L.marker(latlng, {
+    draggable: true,
+    icon: L.divIcon({
+      className: '',
+      html: '<div style="width:18px;height:18px;border-radius:50%;background:'+color+';border:3px solid white;box-shadow:0 0 0 2px rgba(0,0,0,.4);"></div>',
+      iconSize: [18, 18], iconAnchor: [9, 9]
+    })
+  }).addTo(map);
+  m.on('drag', () => editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng())));
+  m.on('dblclick', () => {
+    if (vertexMarkers.length <= 3) { alert('La cerca necesita al menos 3 puntos'); return; }
+    map.removeLayer(m);
+    vertexMarkers = vertexMarkers.filter(x => x !== m);
+    editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
+  });
+  vertexMarkers.splice(mejorIdx, 0, m);
+  editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
+}
+
+// Tomar la forma editada y limpiar los marcadores
+function capturarForma(c) {
+  if (vertexMarkers.length) {
+    c.poligono = vertexMarkers.map(m => {
+      const ll = m.getLatLng();
+      return { lat: ll.lat, lng: ll.lng };
+    });
+  }
+  vertexMarkers.forEach(m => map.removeLayer(m));
+  vertexMarkers = [];
+  if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
+  editandoForma = false;
 }
 
 async function guardarEdicionCerca() {
@@ -1180,14 +1252,7 @@ async function guardarEdicionCerca() {
   if (!c) return;
 
   // Si quedó la edición de forma activa, capturarla primero
-  if (editandoForma && editPolyLayer) {
-    const latlngs = editPolyLayer.getLatLngs()[0];
-    c.poligono = latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }));
-    editPolyLayer.editing.disable();
-    map.removeLayer(editPolyLayer);
-    editPolyLayer = null;
-    editandoForma = false;
-  }
+  if (editandoForma) capturarForma(c);
 
   // Tomar los valores del formulario
   c.nombre = document.getElementById('ec-nombre').value.trim() || c.nombre;
@@ -1218,10 +1283,10 @@ async function guardarEdicionCerca() {
 }
 
 function cancelarEdicionCerca() {
-  if (editandoForma && editPolyLayer) {
-    editPolyLayer.editing.disable();
-    map.removeLayer(editPolyLayer);
-    editPolyLayer = null;
+  if (editandoForma) {
+    vertexMarkers.forEach(m => map.removeLayer(m));
+    vertexMarkers = [];
+    if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
     editandoForma = false;
   }
   editingCercaId = null;
