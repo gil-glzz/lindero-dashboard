@@ -816,21 +816,31 @@ function setLayer(t) {
 let animalMarkers = {};
 let cercaLayers = {};
 
+// ¿El collar está reportando? (en línea si reportó hace < 5 min)
+const UMBRAL_EN_LINEA_MS = 5 * 60 * 1000;   // 5 minutos
+function estaEnLinea(a) {
+  if (!a.ultimaConexion) return false;
+  return (Date.now() - a.ultimaConexion) < UMBRAL_EN_LINEA_MS;
+}
+
 function renderAnimales() {
   Object.values(animalMarkers).forEach(m => map.removeLayer(m));
   animalMarkers = {};
   animales.forEach(a => {
     const lote = lotes.find(l => l.id === a.lote);
-    const color = lote ? lote.color : '#888';
+    const enLinea = estaEnLinea(a);
+    // Sin señal: marcador gris y semitransparente
+    const color = !enLinea ? '#6b7280' : (lote ? lote.color : '#888');
     const borderColor = a.estado === 'shock' ? '#f87171' : a.estado === 'warn' ? '#fbbf24' : 'white';
+    const opacidad = enLinea ? '1' : '0.5';
     const icon = L.divIcon({
       className: '',
-      html: `<div class="animal-marker" style="width:18px;height:18px;background:${color};border-color:${borderColor}"></div>`,
+      html: `<div class="animal-marker" style="width:18px;height:18px;background:${color};border-color:${borderColor};opacity:${opacidad}"></div>`,
       iconSize: [18,18], iconAnchor: [9,9]
     });
     const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
     m.on('click', () => abrirPerfilAnimal(a.id));
-    m.bindTooltip(a.nombre, { direction: 'top', offset: [0,-10] });
+    m.bindTooltip(a.nombre + (enLinea ? '' : ' (sin señal)'), { direction: 'top', offset: [0,-10] });
     animalMarkers[a.id] = m;
   });
 }
@@ -1147,6 +1157,10 @@ function renderAnimalesList() {
   cont.innerHTML = animales.map(a => {
     const lote = lotes.find(l => l.id === a.lote);
     const stColor = a.estado==='shock'?'#f87171':a.estado==='warn'?'#fbbf24':'#4ade80';
+    const enLinea = estaEnLinea(a);
+    const conexion = enLinea
+      ? '<span style="color:#4ade80">● en línea</span>'
+      : '<span style="color:#6b7280">○ sin señal</span>';
     return `<div class="lote-card" onclick="abrirPerfilAnimal(${a.id})">
       <div class="lote-head">
         <div class="lote-color" style="background:${lote?lote.color:'#888'}"></div>
@@ -1154,7 +1168,7 @@ function renderAnimalesList() {
         <div class="lote-count" style="background:${stColor}22; color:${stColor}">${a.collar}</div>
       </div>
       <div class="lote-meta">
-        <span>${a.raza}</span><span>${a.peso}kg</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%</span>
+        <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%</span>
       </div>
     </div>`;
   }).join('');
@@ -1200,7 +1214,12 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-notas').textContent = a.notas || 'Sin notas';
 
   // Datos en vivo del collar
-  document.getElementById('modal-ultcon').textContent = tiempoRelativo(a.ultimaConexion);
+  const ultconEl = document.getElementById('modal-ultcon');
+  if (estaEnLinea(a)) {
+    ultconEl.innerHTML = '<span style="color:#4ade80">● En línea</span> · ' + tiempoRelativo(a.ultimaConexion);
+  } else {
+    ultconEl.innerHTML = '<span style="color:#6b7280">○ Sin señal</span> · ' + tiempoRelativo(a.ultimaConexion);
+  }
   document.getElementById('modal-distborde').textContent =
     (a.distBorde != null && a.distBorde < 9000) ? Math.round(a.distBorde) + ' m' : '—';
   document.getElementById('modal-sats').textContent = a.sats != null ? a.sats : '—';
