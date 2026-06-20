@@ -334,6 +334,13 @@
         <div id="alertas-list" style="background:#141d16;"></div>
       </div>
     </div>
+    <div style="position:relative;">
+      <button onclick="toggleReporte()" title="Resumen del día" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:16px; margin-left:8px;">📊</button>
+      <div id="reporte-panel" style="display:none; position:absolute; top:48px; right:0; width:340px; max-width:90vw; max-height:440px; overflow-y:auto; background:#141d16; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.7); z-index:3000;">
+        <div style="padding:12px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:14px; background:#1a2519; border-radius:12px 12px 0 0;">Resumen del día</div>
+        <div id="reporte-contenido" style="padding:14px; font-size:13px;"></div>
+      </div>
+    </div>
     <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto; padding:6px 14px; font-size:12px; margin-left:8px;">Salir</button>
   </div>
 </header>
@@ -347,6 +354,7 @@
       <button class="sidebar-tab active" onclick="showTab('lotes')">Lotes</button>
       <button class="sidebar-tab" onclick="showTab('cercas')">Cercas</button>
       <button class="sidebar-tab" onclick="showTab('animales')">Animales</button>
+      <button class="sidebar-tab" onclick="showTab('agua')">Agua</button>
     </div>
     <div class="sidebar-content scroll-thin">
 
@@ -392,6 +400,7 @@
             <option value="permanente">Permanente</option>
             <option value="temporal">Temporal</option>
             <option value="exclusion">Exclusión (prohibida)</option>
+            <option value="simbolica">Simbólica (solo visual)</option>
           </select>
         </div>
         <div class="field" id="field-horas" style="display:none">
@@ -399,8 +408,9 @@
           <input id="cerca-horas" type="number" value="6" min="1" max="72"/>
         </div>
         <div class="field">
-          <label>Zona de aviso (metros)</label>
-          <input id="cerca-warn" type="number" value="12" min="5" max="100"/>
+          <p id="cerca-aviso-texto" style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel); padding:10px 12px; border-radius:8px; margin:0;">
+            🔔 El buzzer empezará a avisar cuando el animal esté a <strong>10 metros</strong> del borde, más fuerte conforme se acerca.
+          </p>
         </div>
         <button class="btn btn-primary" id="btn-draw-toggle" onclick="toggleDraw()">
           Empezar a dibujar
@@ -441,11 +451,8 @@
             <option value="permanente">Permanente</option>
             <option value="temporal">Temporal</option>
             <option value="exclusion">Exclusión</option>
+            <option value="simbolica">Simbólica (solo visual)</option>
           </select>
-        </div>
-        <div class="field">
-          <label>Zona de aviso (metros)</label>
-          <input id="ec-warn" type="number" min="5" max="100"/>
         </div>
         <div class="field">
           <label>Color de la cerca</label>
@@ -468,6 +475,21 @@
         <button class="btn" onclick="abrirNuevoAnimal()" style="margin-top:8px">
           + Registrar animal
         </button>
+      </div>
+
+      <!-- AGUAJES (puntos de agua) -->
+      <div id="pane-agua" style="display:none">
+        <p class="sec-title">Aguajes (puntos de agua)</p>
+        <p style="font-size:12px; color:var(--text-dim); line-height:1.5; margin-bottom:12px;">
+          Marca dónde hay un lago, tanque o pozo. El sistema contará cuántas veces tus animales se acercan a beber a cada uno.
+        </p>
+        <div id="aguajes-list"></div>
+        <button class="btn btn-primary" id="btn-agua-toggle" onclick="toggleColocarAguaje()" style="margin-top:8px">
+          💧 Marcar aguaje en el mapa
+        </button>
+        <p id="agua-hint" style="font-size:12px; color:var(--accent); margin-top:10px; display:none; line-height:1.5;">
+          Toca el mapa donde está el aguaje.
+        </p>
       </div>
 
     </div>
@@ -645,9 +667,14 @@ document.addEventListener('keydown', (e) => {
 // Cerrar el panel de alertas al hacer clic fuera de él
 document.addEventListener('click', (e) => {
   const panel = document.getElementById('alertas-panel');
-  if (!panel || panel.style.display !== 'block') return;
-  if (!panel.contains(e.target) && !e.target.closest('[onclick="toggleAlertas()"]')) {
+  if (panel && panel.style.display === 'block' &&
+      !panel.contains(e.target) && !e.target.closest('[onclick="toggleAlertas()"]')) {
     panel.style.display = 'none';
+  }
+  const rep = document.getElementById('reporte-panel');
+  if (rep && rep.style.display === 'block' &&
+      !rep.contains(e.target) && !e.target.closest('[onclick="toggleReporte()"]')) {
+    rep.style.display = 'none';
   }
 });
 
@@ -869,6 +896,9 @@ function setLayer(t) {
 // Capas de animales y cercas
 let animalMarkers = {};
 let cercaLayers = {};
+let aguajes = [];
+let aguajeLayers = {};
+let colocandoAguaje = false;
 
 // ¿El collar está reportando? (en línea si reportó hace < 5 min)
 const UMBRAL_EN_LINEA_MS = 5 * 60 * 1000;   // 5 minutos
@@ -903,12 +933,19 @@ function renderCercas() {
   Object.values(cercaLayers).forEach(l => map.removeLayer(l));
   cercaLayers = {};
   cercas.forEach(c => {
+    const activa = c.activa !== false;
+    const esSimbolica = c.tipo === 'simbolica';
     const latlngs = c.poligono.map(p => [p.lat, p.lng]);
     const poly = L.polygon(latlngs, {
-      color: c.color, fillColor: c.color, fillOpacity: 0.15, weight: 2,
-      dashArray: c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null
+      color: esSimbolica ? '#9ca3af' : c.color,
+      fillColor: c.color,
+      fillOpacity: esSimbolica ? 0 : (activa ? 0.15 : 0.04),
+      weight: 2,
+      opacity: activa ? 1 : 0.4,
+      dashArray: esSimbolica ? '1 5' : (!activa ? '4 8' : (c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null))
     }).addTo(map);
-    let popup = `<b>${c.nombre}</b><br>${c.tipo}`;
+    let popup = `<b>${c.nombre}</b><br>${c.tipo}${activa ? '' : ' · inactiva'}`;
+    if (esSimbolica) popup = `<b>${c.nombre}</b><br>cerca simbólica (solo referencia)`;
     if (c.expiraEn) {
       const ms = c.expiraEn - Date.now();
       const h = Math.max(0, Math.floor(ms/3600000));
@@ -946,6 +983,11 @@ function toggleDraw() {
 }
 
 map.on('click', (e) => {
+  // Si estamos colocando un aguaje, el clic crea el punto de agua (no cerca)
+  if (colocandoAguaje) {
+    crearAguajeEn(e.latlng.lat, e.latlng.lng);
+    return;
+  }
   if (!drawingMode) return;
   currentPolyPts.push([e.latlng.lat, e.latlng.lng]);
   const m = L.circleMarker(e.latlng, { radius: 5, color: '#4ade80', fillColor:'#4ade80', fillOpacity:1 }).addTo(map);
@@ -991,7 +1033,7 @@ function guardarCercaActual() {
     nombre: document.getElementById('cerca-nombre').value || 'Potrero',
     tipo,
     color: tipo === 'exclusion' ? '#f87171' : (lote ? lote.color : '#4ade80'),
-    warn_dist_m: parseInt(document.getElementById('cerca-warn').value) || 12,
+    warn_dist_m: 10,
     poligono: currentPolyPts.map(p => ({ lat: p[0], lng: p[1] })),
     collares: animales.filter(a => a.lote === loteId).map(a => a.collar),
     expiraEn: tipo === 'temporal' ? Date.now() + horas*3600000 : null
@@ -1016,7 +1058,6 @@ function guardarCercaActual() {
 // Abrir el dibujo de una cerca nueva con el formulario limpio
 function abrirNuevaCerca() {
   document.getElementById('cerca-nombre').value = '';
-  document.getElementById('cerca-warn').value = 12;
   document.getElementById('cerca-tipo').value = 'permanente';
   if (typeof toggleHoras === 'function') toggleHoras();
   refreshCercaLoteSelect();
@@ -1450,29 +1491,38 @@ function quitarRecorrido() {
 //  TABS Y UTILIDADES
 // ════════════════════════════════════════════════════════════
 function showTab(t) {
-  ['lotes','nuevolote','cerca','cercas','editcerca','animales'].forEach(p => {
+  ['lotes','nuevolote','cerca','cercas','editcerca','animales','agua'].forEach(p => {
     const el = document.getElementById('pane-'+p);
     if (el) el.style.display = (p===t) ? 'block' : 'none';
   });
   document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
-  // 3 pestañas: Lotes(0), Cercas(1), Animales(2).
-  // Los sub-paneles resaltan su pestaña padre:
-  //   nuevolote → Lotes ; cerca/editcerca → Cercas
   const tabMap = {
     lotes: 0, nuevolote: 0,
     cercas: 1, cerca: 1, editcerca: 1,
-    animales: 2
+    animales: 2,
+    agua: 3
   };
   if (tabMap[t] !== undefined) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
   }
   if (t === 'cerca') refreshCercaLoteSelect();
   if (t === 'cercas') renderCercasList();
+  if (t === 'agua') renderAguajes();
 }
 
 function toggleHoras() {
   const tipo = document.getElementById('cerca-tipo').value;
   document.getElementById('field-horas').style.display = tipo==='temporal'?'block':'none';
+  const aviso = document.getElementById('cerca-aviso-texto');
+  if (aviso) {
+    if (tipo === 'simbolica') {
+      aviso.innerHTML = '👁️ Cerca <strong>solo visual</strong>: aparece en el mapa como referencia, pero no activa el buzzer ni genera alertas.';
+    } else if (tipo === 'exclusion') {
+      aviso.innerHTML = '🚫 Zona <strong>prohibida</strong>: el buzzer avisará cuando el animal se acerque a <strong>10 m</strong> de entrar, para mantenerlo afuera.';
+    } else {
+      aviso.innerHTML = '🔔 El buzzer empezará a avisar cuando el animal esté a <strong>10 metros</strong> del borde, más fuerte conforme se acerca.';
+    }
+  }
 }
 
 function updateStats() {
@@ -1564,7 +1614,7 @@ async function actualizarDesdeServidor() {
 
   // 2. Cercas guardadas en el servidor
   try {
-    const res = await authFetch(`${API_BASE}/geovallas`);
+    const res = await authFetch(`${API_BASE}/geovallas?todas=true`);
     if (res.ok) {
       const data = await res.json();
       cercas = data.map(g => ({
@@ -1573,6 +1623,7 @@ async function actualizarDesdeServidor() {
         tipo: g.tipo,
         color: g.color || '#4ade80',
         warn_dist_m: g.warn_dist_m,
+        activa: g.activa !== false,
         poligono: typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono,
         collares: typeof g.collares === 'string' ? JSON.parse(g.collares) : (g.collares || []),
         expiraEn: g.expira_en ? new Date(g.expira_en).getTime() : null,
@@ -1582,6 +1633,9 @@ async function actualizarDesdeServidor() {
       renderCercasList();
     }
   } catch(e) { /* sin conexión */ }
+
+  // 2b. Aguajes (puntos de agua)
+  cargarAguajes();
 
   // 3. Alertas (cruces y avisos)
   try {
@@ -1683,7 +1737,186 @@ async function borrarCerca(id) {
   }
 }
 
-// Render de la lista de cercas guardadas
+// Activar o desactivar una cerca (sin borrarla). Útil para potreros
+// que se rotan: dibujas todos una vez y vas activando el que toca.
+async function toggleCercaActiva(id) {
+  const c = cercas.find(x => x.id === id);
+  if (!c) return;
+  const nuevoEstado = !(c.activa !== false);
+  try {
+    const res = await authFetch(`${API_BASE}/geovallas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activa: nuevoEstado })
+    });
+    if (res.ok) {
+      c.activa = nuevoEstado;
+      renderCercas();
+      renderCercasList();
+    } else {
+      alert('No se pudo cambiar el estado de la cerca.');
+    }
+  } catch(e) {
+    alert('Error de conexión.');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  REPORTE / RESUMEN DEL DÍA
+// ════════════════════════════════════════════════════════════
+function toggleReporte() {
+  const panel = document.getElementById('reporte-panel');
+  const abierto = panel.style.display === 'block';
+  panel.style.display = abierto ? 'none' : 'block';
+  if (!abierto) cargarReporte();
+}
+
+async function cargarReporte() {
+  const cont = document.getElementById('reporte-contenido');
+  cont.innerHTML = '<p style="color:var(--text-dim);">Cargando…</p>';
+  try {
+    const res = await authFetch(`${API_BASE}/reporte-diario`);
+    if (!res.ok) { cont.innerHTML = '<p style="color:var(--danger);">No se pudo cargar el resumen.</p>'; return; }
+    const r = await res.json();
+
+    let html = `<div style="display:flex; gap:10px; margin-bottom:14px;">
+      <div style="flex:1; background:var(--panel); border-radius:10px; padding:12px; text-align:center;">
+        <div style="font-size:22px; font-weight:700; color:#fbbf24;">${r.avisos||0}</div>
+        <div style="font-size:11px; color:var(--text-dim);">avisos hoy</div>
+      </div>
+      <div style="flex:1; background:var(--panel); border-radius:10px; padding:12px; text-align:center;">
+        <div style="font-size:22px; font-weight:700; color:var(--danger);">${r.cruces||0}</div>
+        <div style="font-size:11px; color:var(--text-dim);">cruces hoy</div>
+      </div>
+    </div>`;
+
+    // Aguajes
+    if (r.aguajes && r.aguajes.length) {
+      html += `<p style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin:14px 0 8px;">💧 Visitas a aguajes</p>`;
+      r.aguajes.forEach(a => {
+        html += `<div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
+          <span>${a.nombre}</span><strong>${a.visitas} ${a.visitas===1?'visita':'visitas'}</strong></div>`;
+      });
+    }
+
+    // Collares (estado + batería)
+    if (r.collares && r.collares.length) {
+      html += `<p style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin:14px 0 8px;">🐄 Collares</p>`;
+      r.collares.forEach(c => {
+        const animal = animales.find(x => x.collar === c.device);
+        const nombre = animal ? animal.nombre : c.device;
+        const est = c.estado === 'shock' ? '🔴 fuera' : c.estado === 'warn' ? '🟡 aviso' : '🟢 dentro';
+        html += `<div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
+          <span>${nombre}</span><span>${est}</span></div>`;
+      });
+    }
+
+    if ((!r.aguajes || !r.aguajes.length) && (!r.cruces && !r.avisos)) {
+      html += `<p style="color:var(--text-dim); text-align:center; padding:10px 0;">Día tranquilo, sin novedades. 🐄</p>`;
+    }
+    cont.innerHTML = html;
+  } catch(e) {
+    cont.innerHTML = '<p style="color:var(--danger);">Error de conexión.</p>';
+  }
+}
+
+
+async function cargarAguajes() {
+  try {
+    const res = await authFetch(`${API_BASE}/aguajes`);
+    if (res.ok) {
+      aguajes = await res.json();
+      dibujarAguajes();
+      renderAguajes();
+    }
+  } catch(e) {}
+}
+
+// Icono de gota para el mapa
+function iconoAguaje() {
+  return L.divIcon({
+    className: 'aguaje-icon',
+    html: `<div style="font-size:22px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));">💧</div>`,
+    iconSize: [24, 24], iconAnchor: [12, 12]
+  });
+}
+
+function dibujarAguajes() {
+  Object.values(aguajeLayers).forEach(l => map.removeLayer(l));
+  aguajeLayers = {};
+  aguajes.forEach(a => {
+    const m = L.marker([a.lat, a.lng], { icon: iconoAguaje() }).addTo(map);
+    m.bindPopup(`<b>💧 ${a.nombre}</b><br>radio ${a.radio_m||20}m`);
+    aguajeLayers[a.id] = m;
+  });
+}
+
+function renderAguajes() {
+  const cont = document.getElementById('aguajes-list');
+  if (!cont) return;
+  if (!aguajes.length) {
+    cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:12px 0;">Aún no hay aguajes marcados.</p>';
+    return;
+  }
+  cont.innerHTML = aguajes.map(a => `
+    <div class="lote-card" onclick="irACerca([{&quot;lat&quot;:${a.lat},&quot;lng&quot;:${a.lng}}])">
+      <div class="lote-head">
+        <div style="font-size:18px;">💧</div>
+        <div class="lote-name">${a.nombre}</div>
+        <button onclick="event.stopPropagation(); borrarAguaje(${a.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Quitar</button>
+      </div>
+      <div class="lote-meta"><span>radio ${a.radio_m||20} m</span></div>
+    </div>`).join('');
+}
+
+function toggleColocarAguaje() {
+  colocandoAguaje = !colocandoAguaje;
+  const btn = document.getElementById('btn-agua-toggle');
+  const hint = document.getElementById('agua-hint');
+  if (colocandoAguaje) {
+    btn.textContent = '✕ Cancelar';
+    hint.style.display = 'block';
+    if (map) map.getContainer().style.cursor = 'crosshair';
+  } else {
+    btn.textContent = '💧 Marcar aguaje en el mapa';
+    hint.style.display = 'none';
+    if (map) map.getContainer().style.cursor = '';
+  }
+}
+
+async function crearAguajeEn(lat, lng) {
+  const nombre = prompt('Nombre del aguaje (ej: Pozo norte, Tanque grande):', 'Aguaje');
+  if (nombre === null) { toggleColocarAguaje(); return; }
+  try {
+    const res = await authFetch(`${API_BASE}/aguajes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: nombre || 'Aguaje', lat, lng, radio_m: 20 })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      aguajes.unshift(data.aguaje);
+      dibujarAguajes();
+      renderAguajes();
+    } else {
+      alert('No se pudo guardar el aguaje.');
+    }
+  } catch(e) { alert('Error de conexión.'); }
+  toggleColocarAguaje();
+}
+
+async function borrarAguaje(id) {
+  if (!confirm('¿Quitar este aguaje?')) return;
+  try {
+    const res = await authFetch(`${API_BASE}/aguajes/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      aguajes = aguajes.filter(a => a.id !== id);
+      dibujarAguajes();
+      renderAguajes();
+    }
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+
 function renderCercasList() {
   const cont = document.getElementById('cercas-list');
   if (!cont) return;
@@ -1698,15 +1931,22 @@ function renderCercasList() {
       const ms = c.expiraEn - Date.now();
       timer = ms > 0 ? ` · expira en ${Math.floor(ms/3600000)}h` : ' · expirada';
     }
-    return `<div class="lote-card" onclick="irACerca(${JSON.stringify(c.poligono).replace(/"/g,'&quot;')})">
+    const activa = c.activa !== false;
+    return `<div class="lote-card" style="${activa?'':'opacity:.5'}" onclick="irACerca(${JSON.stringify(c.poligono).replace(/"/g,'&quot;')})">
       <div class="lote-head">
         <div class="lote-color" style="background:${c.color}"></div>
         <div class="lote-name">${c.nombre}</div>
         <button onclick="event.stopPropagation(); abrirEditarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <button onclick="event.stopPropagation(); borrarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Borrar</button>
       </div>
-      <div class="lote-meta">
-        <span>${tipoLabel}</span><span>${c.poligono.length} vértices</span><span>aviso ${c.warn_dist_m}m${timer}</span>
+      <div class="lote-meta" style="margin-top:8px; align-items:center;">
+        <span>${tipoLabel}</span><span>${c.poligono.length} vértices${timer}</span>
+        <label style="margin-left:auto; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="event.stopPropagation();">
+          <span style="color:${activa?'#4ade80':'var(--text-dim)'}; font-weight:500;">${activa?'Activa':'Inactiva'}</span>
+          <span onclick="toggleCercaActiva(${c.id})" style="position:relative; width:38px; height:21px; border-radius:11px; background:${activa?'#4ade80':'#4b5563'}; display:inline-block; transition:background .2s;">
+            <span style="position:absolute; top:2px; ${activa?'right:2px':'left:2px'}; width:17px; height:17px; border-radius:50%; background:#fff; transition:all .2s;"></span>
+          </span>
+        </label>
       </div>
     </div>`;
   }).join('');
@@ -1734,7 +1974,6 @@ function abrirEditarCerca(id) {
   // Llenar el formulario
   document.getElementById('ec-nombre').value = c.nombre;
   document.getElementById('ec-tipo').value = c.tipo || 'permanente';
-  document.getElementById('ec-warn').value = c.warn_dist_m;
 
   // Paleta de colores (marcar el actual)
   const cont = document.getElementById('ec-colors');
@@ -1868,7 +2107,7 @@ async function guardarEdicionCerca() {
   // Tomar los valores del formulario
   c.nombre = document.getElementById('ec-nombre').value.trim() || c.nombre;
   c.tipo = document.getElementById('ec-tipo').value;
-  c.warn_dist_m = parseInt(document.getElementById('ec-warn').value) || c.warn_dist_m;
+  c.warn_dist_m = 10;
   c.color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
 
   // Guardar en el servidor
