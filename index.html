@@ -764,10 +764,33 @@ async function listarCuentas() {
       const cuentas = await res.json();
       const cont = document.getElementById('lista-cuentas');
       cont.innerHTML = cuentas.length
-        ? cuentas.map(u => `<div style="padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;"><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>`).join('')
+        ? cuentas.map(u => `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
+            <div><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>
+            <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="borrarCuenta(${u.id}, '${u.rancho.replace(/'/g,"\\'")}')">Borrar</button>
+          </div>`).join('')
         : '<p style="color:var(--text-dim)">No hay cuentas aún.</p>';
     }
   } catch(e) {}
+}
+
+// Borrar una cuenta (cuando un cliente deja el servicio).
+// Libera también sus collares para poder reasignarlos a otro cliente.
+async function borrarCuenta(id, rancho) {
+  const adminPass = document.getElementById('admin-pass').value;
+  if (!adminPass) return;
+  if (!confirm(`¿Borrar la cuenta de "${rancho}"?\n\nSe eliminará el acceso de este cliente y sus collares quedarán libres para reasignarlos. Esta acción no se puede deshacer.`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/admin/usuarios/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': adminPass }
+    });
+    if (res.ok) {
+      listarCuentas();
+      listarCollaresAsignados();
+    } else {
+      alert('No se pudo borrar la cuenta.');
+    }
+  } catch(e) { alert('Error de conexión.'); }
 }
 
 async function listarCollaresAsignados() {
