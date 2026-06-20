@@ -302,6 +302,10 @@
     <button class="btn" onclick="asignarCollar()" style="width:100%;">Asignar collar</button>
     <p id="asig-msg" style="font-size:13px; text-align:center; margin-top:12px; display:none;"></p>
 
+    <p class="sec-title" style="margin-top:28px;">Collares asignados</p>
+    <p style="font-size:11px; color:var(--text-dim); margin-bottom:10px;">Cada collar solo puede pertenecer a un rancho. Aquí puedes ver y quitar asignaciones para evitar duplicados.</p>
+    <div id="lista-collares" style="font-size:13px;">Escribe tu contraseña arriba para ver los collares.</div>
+
     <p class="sec-title" style="margin-top:28px;">Cuentas existentes</p>
     <div id="lista-cuentas" style="font-size:13px;"></div>
   </div>
@@ -650,7 +654,9 @@ document.addEventListener('click', (e) => {
 function abrirAdmin() {
   document.getElementById('admin-screen').style.display = 'block';
   const pass = document.getElementById('admin-pass');
-  pass.oninput = () => { if (pass.value.length > 4) listarCuentas(); };
+  pass.oninput = () => {
+    if (pass.value.length > 4) { listarCuentas(); listarCollaresAsignados(); }
+  };
 }
 function cerrarAdmin() { document.getElementById('admin-screen').style.display = 'none'; }
 
@@ -709,6 +715,7 @@ async function asignarCollar() {
       msg.style.color = 'var(--accent)';
       document.getElementById('asig-device').value = '';
       document.getElementById('asig-dueno').value = '';
+      listarCollaresAsignados();
     } else {
       msg.textContent = '⚠ ' + (data.error || 'No se pudo asignar');
       msg.style.color = 'var(--danger)';
@@ -734,6 +741,53 @@ async function listarCuentas() {
         : '<p style="color:var(--text-dim)">No hay cuentas aún.</p>';
     }
   } catch(e) {}
+}
+
+async function listarCollaresAsignados() {
+  const adminPass = document.getElementById('admin-pass').value;
+  if (!adminPass) return;
+  const cont = document.getElementById('lista-collares');
+  try {
+    const res = await fetch(`${API_BASE}/admin/collares-asignados`, {
+      headers: { 'x-admin-password': adminPass }
+    });
+    if (res.ok) {
+      const collares = await res.json();
+      cont.innerHTML = collares.length
+        ? collares.map(c => `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
+              <div>
+                <strong>${c.device}</strong><br>
+                <span style="color:var(--text-dim)">${c.rancho || '(rancho sin nombre)'} — ${c.dueno}</span>
+              </div>
+              <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="quitarAsignacionCollar('${c.device}')">Quitar</button>
+            </div>`).join('')
+        : '<p style="color:var(--text-dim)">Ningún collar asignado todavía.</p>';
+    } else {
+      cont.innerHTML = '<p style="color:var(--danger)">Contraseña de admin incorrecta.</p>';
+    }
+  } catch(e) {
+    cont.innerHTML = '<p style="color:var(--danger)">Error de conexión.</p>';
+  }
+}
+
+async function quitarAsignacionCollar(device) {
+  const adminPass = document.getElementById('admin-pass').value;
+  if (!adminPass) return;
+  if (!confirm(`¿Quitar la asignación del collar ${device}?\n\nEl collar quedará libre para asignarlo a otro rancho.`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/admin/asignar-collar/${encodeURIComponent(device)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': adminPass }
+    });
+    if (res.ok) {
+      listarCollaresAsignados();
+    } else {
+      alert('No se pudo quitar la asignación.');
+    }
+  } catch(e) {
+    alert('Error de conexión.');
+  }
 }
 
 const PALETA = ['#4ade80','#f87171','#fbbf24','#60a5fa','#c084fc','#fb923c','#2dd4bf','#f472b6'];
