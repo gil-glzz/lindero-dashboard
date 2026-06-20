@@ -1087,8 +1087,13 @@ async function enviarCercaAlServidor(cerca) {
 function renderLotes() {
   const cont = document.getElementById('lotes-list');
   cont.innerHTML = lotes.map(l => {
-    const count = animales.filter(a => a.lote === l.id).length;
-    const dentro = animales.filter(a => a.lote === l.id && a.estado === 'ok').length;
+    const enLote = animales.filter(a => a.lote === l.id);
+    const count  = enLote.length;
+    // Los tres estados SIEMPRE suman el total (ningún animal se "pierde"):
+    // fuera = cruzó la cerca, aviso = cerca del borde, dentro = todo lo demás.
+    const fuera  = enLote.filter(a => a.estado === 'shock').length;
+    const aviso  = enLote.filter(a => a.estado === 'warn').length;
+    const dentro = count - fuera - aviso;
     const cercaLote = cercas.find(c => c.collares?.some(col => animales.find(a => a.collar===col && a.lote===l.id)));
     return `<div class="lote-card ${selectedLote===l.id?'selected':''}" onclick="selectLote(${l.id})">
       <div class="lote-head">
@@ -1097,8 +1102,12 @@ function renderLotes() {
         <button onclick="event.stopPropagation(); abrirEditarLote(${l.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <div class="lote-count">${count}</div>
       </div>
-      <div class="lote-meta">
-        <span>● ${dentro} dentro</span>
+      <div class="lote-meta" style="margin-top:8px;">
+        <span style="color:#4ade80;">● ${dentro} dentro</span>
+        <span style="color:#fbbf24;">● ${aviso} aviso</span>
+        <span style="color:#f87171;">● ${fuera} fuera</span>
+      </div>
+      <div class="lote-meta" style="margin-top:4px;">
         <span>${cercaLote ? '◈ con cerca' : '○ sin cerca'}</span>
       </div>
     </div>`;
@@ -1469,8 +1478,11 @@ function toggleHoras() {
 function updateStats() {
   document.getElementById('stat-animales').textContent = animales.length;
   document.getElementById('stat-lotes').textContent = lotes.length;
-  document.getElementById('stat-dentro').textContent = animales.filter(a=>a.estado==='ok').length;
-  document.getElementById('stat-alertas').textContent = animales.filter(a=>a.estado!=='ok').length;
+  // Consistente con las tarjetas: dentro = ni aviso ni fuera
+  document.getElementById('stat-dentro').textContent =
+    animales.filter(a => a.estado !== 'warn' && a.estado !== 'shock').length;
+  document.getElementById('stat-alertas').textContent =
+    animales.filter(a => a.estado === 'warn' || a.estado === 'shock').length;
 }
 
 // Color picker para lotes
