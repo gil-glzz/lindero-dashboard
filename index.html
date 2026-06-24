@@ -1295,7 +1295,7 @@ function renderAnimalesList() {
         <div class="lote-count" style="background:${stColor}22; color:${stColor}">${a.collar}</div>
       </div>
       <div class="lote-meta">
-        <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%</span>
+        <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%${a.carga === 1 ? ' ⚡' : ''}</span>
       </div>
     </div>`;
   }).join('');
@@ -1335,7 +1335,7 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-sexo').textContent = a.sexo;
   document.getElementById('modal-actividad').textContent = a.actividad + ' h';
   const batEl = document.getElementById('modal-bateria');
-  batEl.textContent = bateriaIcono(a.bateria) + ' ' + a.bateria + '%';
+  batEl.textContent = bateriaIcono(a.bateria) + ' ' + a.bateria + '%' + (a.carga === 1 ? ' ⚡ cargando' : '');
   batEl.style.color = bateriaColor(a.bateria);
   document.getElementById('modal-arete').textContent = a.arete || '—';
   document.getElementById('modal-notas').textContent = a.notas || 'Sin notas';
@@ -1629,6 +1629,7 @@ async function actualizarDesdeServidor() {
           if (c.sats != null)       a.sats = c.sats;
           if (c.rssi != null)       a.rssi = c.rssi;
           if (c.bateria != null)    a.bateria = c.bateria;
+          if (c.carga != null)      a.carga = c.carga;
         }
       });
       renderAnimales(); renderLotes();
