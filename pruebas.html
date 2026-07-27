@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://collar-gps-server.onrender.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Lindero · Consola de pruebas de campo</title>
+<meta name="theme-color" content="#0d1410">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1410; --panel:#141d16; --panel-2:#18241a; --border:#243425; --border-soft:#1c2a1e;
+    --ink:#e8efe6; --ink-dim:#9db09c; --ink-faint:#6f836f;
+    --accent:#4ade80; --accent-dim:#1f5236;
+    /* estado (siempre con icono+etiqueta, nunca color solo) */
+    --ok:#4ade80; --ok-wash:#12251a;
+    --warn:#fbbf24; --warn-wash:#2a230d;
+    --bad:#f87171; --bad-wash:#2a1615;
+    --mute:#7b8a7c; --mute-wash:#1a221b;
+    --signal:#38bdf8; --signal-wash:#0e2230;
+    --mono:'Space Grotesk',ui-monospace,monospace;
+    --sans:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+    --r:14px; --r-sm:9px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 600px at 80% -10%, #12241a55, transparent);}
+  h1,h2,h3{font-family:var(--mono); font-weight:600; margin:0}
+  .mono{font-family:var(--mono)}
+  a{color:inherit}
+
+  /* ── Header ── */
+  header{position:sticky; top:0; z-index:20; backdrop-filter:blur(10px);
+    background:linear-gradient(#0d1410ee,#0d1410cc); border-bottom:1px solid var(--border);}
+  .head-row{display:flex; align-items:center; gap:14px; padding:14px 20px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:11px; margin-right:auto}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#06130b;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:20px}
+  .brand h1{font-size:16px; letter-spacing:-.01em}
+  .brand .sub{font-size:11px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.08em}
+  .conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--mute); box-shadow:0 0 0 3px #ffffff08}
+  .dot.live{background:var(--ok); box-shadow:0 0 0 3px #4ade8022; animation:pulse 2s infinite}
+  .dot.demo{background:var(--warn); box-shadow:0 0 0 3px #fbbf2422}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .btn{font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--ink);background:var(--panel);border:1px solid var(--border);
+    border-radius:9px;padding:8px 13px;cursor:pointer;white-space:nowrap;transition:.12s}
+  .btn:hover{border-color:var(--accent-dim);background:var(--panel-2)}
+  .btn.primary{background:var(--accent);color:#06130b;border-color:var(--accent);font-weight:600}
+  .btn.sm{padding:5px 9px;font-size:11.5px;border-radius:7px}
+
+  /* ── KPI stat tiles ── */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:0 20px 14px}
+  .kpi{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:13px 15px;position:relative;overflow:hidden}
+  .kpi .k-lbl{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em}
+  .kpi .k-val{font-family:var(--mono);font-size:29px;font-weight:600;line-height:1.05;margin-top:3px}
+  .kpi .k-val small{font-size:.45em;color:var(--ink-faint);font-weight:500}
+  .kpi.accent .k-val{color:var(--ok)} .kpi.warn .k-val{color:var(--warn)} .kpi.bad .k-val{color:var(--bad)} .kpi.mute .k-val{color:var(--ink-dim)}
+  .kpi .k-edge{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border)}
+  .kpi.accent .k-edge{background:var(--ok)} .kpi.warn .k-edge{background:var(--warn)} .kpi.bad .k-edge{background:var(--bad)} .kpi.mute .k-edge{background:var(--mute)}
+
+  /* ── Layout ── */
+  .wrap{padding:4px 20px 40px;display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+  @media(max-width:1000px){ .wrap{grid-template-columns:1fr} }
+  .toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar .sp{margin-left:auto}
+  select,input{font-family:var(--sans);font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+  .section-title{font-size:12px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 2px 10px}
+
+  /* ── Collar cards ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:15px 16px 14px;position:relative;transition:.15s}
+  .card:hover{border-color:var(--border)}
+  .card.st-warn{box-shadow:inset 3px 0 0 var(--warn)} .card.st-bad{box-shadow:inset 3px 0 0 var(--bad)}
+  .card.st-mute{opacity:.82;box-shadow:inset 3px 0 0 var(--mute)} .card.st-ok{box-shadow:inset 3px 0 0 var(--ok)}
+  .c-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+  .c-name{font-family:var(--mono);font-weight:600;font-size:15px;line-height:1.1}
+  .c-dev{font-size:11px;color:var(--ink-faint);margin-top:1px}
+  .c-head .right{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+  .pill.ok{color:var(--ok);background:var(--ok-wash);border-color:#4ade8033}
+  .pill.warn{color:var(--warn);background:var(--warn-wash);border-color:#fbbf2433}
+  .pill.bad{color:var(--bad);background:var(--bad-wash);border-color:#f8717133}
+  .pill.mute{color:var(--ink-dim);background:var(--mute-wash);border-color:#7b8a7c33}
+  .fw{font-size:10.5px;color:var(--ink-faint);font-family:var(--mono)}
+
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin-bottom:11px}
+  .m{min-width:0}
+  .m .m-lbl{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:4px}
+  .m .m-val{font-family:var(--mono);font-size:15px;font-weight:500;margin-top:1px}
+  .m .m-val .q{font-size:10.5px;color:var(--ink-faint);font-weight:400;margin-left:3px}
+  .m .m-val.ok{color:var(--ok)} .m .m-val.warn{color:var(--warn)} .m .m-val.bad{color:var(--bad)} .m .m-val.mute{color:var(--ink-dim)}
+
+  /* meter bar */
+  .meter{height:5px;border-radius:3px;background:#0000003d;overflow:hidden;margin-top:5px;border:1px solid #ffffff08}
+  .meter > i{display:block;height:100%;border-radius:3px}
+
+  /* sparkline */
+  .spark{margin:2px 0 11px}
+  .spark svg{display:block;width:100%;height:34px;overflow:visible}
+  .spark-cap{font-size:10px;color:var(--ink-faint);display:flex;justify-content:space-between;margin-top:2px}
+
+  .counters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{font-size:11px;color:var(--ink-dim);background:var(--panel-2);border:1px solid var(--border-soft);border-radius:7px;padding:3px 8px;display:inline-flex;gap:5px;align-items:center}
+  .chip b{font-family:var(--mono);color:var(--ink);font-weight:600}
+  .chip.hot b{color:var(--bad)} .chip.warm b{color:var(--warn)}
+
+  .c-actions{display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:11px}
+  .verdict{display:flex;gap:6px;margin-left:auto}
+  .vbtn{width:30px;height:28px;border-radius:7px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:13px;display:grid;place-items:center}
+  .vbtn.ok.on{background:var(--ok-wash);border-color:#4ade8055;color:var(--ok)}
+  .vbtn.bad.on{background:var(--bad-wash);border-color:#f8717155;color:var(--bad)}
+
+  /* ── Timeline ── */
+  .side{position:sticky;top:78px}
+  .panel{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:15px 16px}
+  .tl{display:flex;flex-direction:column;gap:0}
+  .ev{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--border-soft)}
+  .ev:last-child{border-bottom:none}
+  .ev .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex-shrink:0;background:var(--panel-2);border:1px solid var(--border-soft)}
+  .ev.bad .ic{background:var(--bad-wash);border-color:#f8717133} .ev.warn .ic{background:var(--warn-wash);border-color:#fbbf2433}
+  .ev.ok .ic{background:var(--ok-wash);border-color:#4ade8033} .ev.info .ic{background:var(--signal-wash);border-color:#38bdf833}
+  .ev .body{min-width:0;flex:1}
+  .ev .t1{font-size:12.5px}
+  .ev .t1 b{font-family:var(--mono);font-weight:600}
+  .ev .t2{font-size:11px;color:var(--ink-faint);margin-top:1px}
+  .empty{color:var(--ink-faint);font-size:12.5px;text-align:center;padding:26px 0}
+  .foot{color:var(--ink-faint);font-size:11px;text-align:center;padding:22px 20px 8px}
+</style>
+</head>
+<body data-palette="#4ade80,#fbbf24,#f87171,#38bdf8">
+
+<header>
+  <div class="head-row">
+    <div class="brand">
+      <div class="logo">L</div>
+      <div><h1>Consola de pruebas</h1><div class="sub">Lindero · diagnóstico de campo</div></div>
+    </div>
+    <div class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">Conectando…</span></div>
+    <button class="btn sm" id="btn-refresh" onclick="cargar()">↻ Refrescar</button>
+    <button class="btn sm" onclick="toggleAuto()" id="btn-auto">⏸ Auto</button>
+    <a class="btn sm" href="index.html">← Panel</a>
+  </div>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<div class="wrap">
+  <main>
+    <div class="toolbar">
+      <label class="section-title" style="margin:0">Collares</label>
+      <select id="f-collar" onchange="render()"><option value="">Todos</option></select>
+      <select id="f-orden" onchange="render()">
+        <option value="riesgo">Ordenar: riesgo primero</option>
+        <option value="nombre">Ordenar: nombre</option>
+        <option value="bateria">Ordenar: batería</option>
+        <option value="senal">Ordenar: señal</option>
+      </select>
+      <span class="sp"></span>
+      <button class="btn sm" onclick="exportarCSV()">⬇ Exportar estado (CSV)</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <aside class="side">
+    <div class="panel">
+      <p class="section-title" style="display:flex;justify-content:space-between">
+        <span>Eventos</span>
+        <select id="f-evento" onchange="renderTimeline()" style="font-size:11px;padding:3px 6px">
+          <option value="">Todos</option><option value="shock">Estímulos</option>
+          <option value="warn">Avisos</option><option value="reinicio">Reinicios</option>
+          <option value="offline">Sin señal</option>
+        </select>
+      </p>
+      <div class="tl" id="timeline"></div>
+    </div>
+  </aside>
+</div>
+
+<p class="foot" id="foot">—</p>
+
+<script>
+const API_BASE = 'https://collar-gps-server.onrender.com';
+const UMBRAL_LINEA_MS = 5*60*1000;
+let TOKEN = null, DEMO = false, AUTO = true, autoTimer = null;
+let collares = [], eventos = [], veredictos = {};
+
+// ── utilidades seguras ──
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
+function haceTxt(ts){ if(!ts)return '—'; const s=Math.max(0,(Date.now()-ts)/1000);
+  if(s<60)return `hace ${Math.round(s)}s`; if(s<3600)return `hace ${Math.round(s/60)} min`;
+  if(s<86400)return `hace ${Math.round(s/3600)} h`; return `hace ${Math.round(s/86400)} d`; }
+const enLinea=c=>c.ts && (Date.now()-c.ts)<UMBRAL_LINEA_MS;
+
+// clasificación de estado (icono + etiqueta, nunca color solo)
+function estadoCollar(c){
+  if(!enLinea(c)) return {k:'mute', ic:'○', txt:'Sin señal'};
+  if(c.estado==='shock') return {k:'bad', ic:'⛔', txt:'Fuera / cruce'};
+  if(c.estado==='warn')  return {k:'warn',ic:'▲', txt:'Aviso'};
+  return {k:'ok', ic:'●', txt:'Dentro'};
+}
+// calidades → nivel de estado
+function nivelHdop(h){ if(h==null)return{k:'mute',q:''}; if(h<=1)return{k:'ok',q:'excelente'}; if(h<=2)return{k:'ok',q:'buena'}; if(h<=5)return{k:'warn',q:'regular'}; return{k:'bad',q:'mala'}; }
+function nivelBat(b){ if(b==null)return{k:'mute'}; if(b>=50)return{k:'ok'}; if(b>=20)return{k:'warn'}; return{k:'bad'}; }
+function pctRssi(r){ return r==null?0:clamp(Math.round((r+120)/90*100),0,100); }
+function nivelRssi(r){ if(r==null)return{k:'mute',q:''}; if(r>-70)return{k:'ok',q:'fuerte'}; if(r>-100)return{k:'warn',q:'media'}; return{k:'bad',q:'débil'}; }
+function pctSnr(s){ return s==null?0:clamp(Math.round((s+20)/30*100),0,100); }
+function nivelSnr(s){ if(s==null)return{k:'mute',q:''}; if(s>=0)return{k:'ok',q:'buena'}; if(s>=-10)return{k:'warn',q:'media'}; return{k:'bad',q:'débil'}; }
+const COLORK={ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)',mute:'var(--mute)',signal:'var(--signal)'};
+
+function meter(pct,k){ return `<div class="meter"><i style="width:${clamp(pct,0,100)}%;background:${COLORK[k]||COLORK.mute}"></i></div>`; }
+function sparkline(vals,color){
+  const v=vals.filter(x=>x!=null); if(v.length<2) return '<div class="spark" style="height:34px"></div>';
+  const mn=Math.min(...v), mx=Math.max(...v), rg=(mx-mn)||1, W=100,H=30;
+  const pts=vals.map((y,i)=>{ if(y==null)return null; const x=(i/(vals.length-1))*W; const yy=H-((y-mn)/rg)*H; return `${x.toFixed(1)},${yy.toFixed(1)}`; }).filter(Boolean).join(' ');
+  const last=v[v.length-1];
+  return `<div class="spark"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg><div class="spark-cap"><span>${vals.length} lecturas</span><span class="mono">${last}</span></div></div>`;
+}
+
+// ── carga de datos ──
+function leerToken(){ try{ return localStorage.getItem('lindero_token'); }catch(e){ return null; } }
+async function api(path){
+  const r = await fetch(API_BASE+path, { headers:{ 'Authorization':'Bearer '+TOKEN } });
+  if(!r.ok) throw new Error(r.status); return r.json();
+}
+async function cargar(){
+  TOKEN = leerToken();
+  if(!TOKEN){ usarDemo('Sin sesión — mostrando datos de ejemplo. Inicia sesión en el Panel.'); return; }
+  try{
+    const [cols, salud, alertas] = await Promise.all([ api('/collares'), api('/salud?limit=200').catch(()=>[]), api('/alertas?limit=80').catch(()=>[]) ]);
+    collares = (cols||[]).map(mapCollar);
+    // enriquecer con salud (uptime, entrega, reinicios) + sparkline de batería
+    const saludPorDev={}; (salud||[]).forEach(s=>{ (saludPorDev[s.device]=saludPorDev[s.device]||[]).push(s); });
+    collares.forEach(c=>{ const h=(saludPorDev[c.device]||[]); c.entrega=h[0]?.entrega_pct; c.uptime=h[0]?.uptime_min;
+      c.batSerie=h.slice(0,20).reverse().map(x=>num(x.bateria)).filter(x=>x!=null); });
+    eventos = construirEventos(alertas, collares);
+    DEMO=false; conState(true, `En vivo · ${collares.length} collares`);
+    pintar();
+  }catch(e){
+    usarDemo('No se pudo conectar con el servidor — mostrando datos de ejemplo.');
+  }
+}
+function mapCollar(c){
+  return { device:c.device, nombre:c.nombre||c.device, lote:c.lote_nombre,
+    lat:num(c.lat), lng:num(c.lng), estado:c.estado||'ok',
+    ts:c.ts?new Date(c.ts).getTime():null,
+    sats:num(c.sats), hdop:num(c.hdop), snr:num(c.snr), rssi:num(c.rssi),
+    speed:num(c.speed), movimiento:c.movimiento, bateria:num(c.bateria), carga:num(c.carga),
+    dist:num(c.dist_borde), firmware:c.firmware, reinicios:num(c.reinicios_anormales),
+    bloqueado:c.bloqueado, shock_pwr:num(c.shock_pwr), batSerie:[] };
+}
+function construirEventos(alertas, cols){
+  const ev=(alertas||[]).map(a=>{
+    const tipo = a.tipo==='shock'?'shock':a.tipo==='aviso'||a.tipo==='warn'?'warn':a.tipo==='bloqueo'?'reinicio':'info';
+    const k = tipo==='shock'?'bad':tipo==='warn'?'warn':tipo==='reinicio'?'info':'ok';
+    return { ts:a.ts?new Date(a.ts).getTime():Date.now(), tipo, k, dev:a.device,
+      ic: tipo==='shock'?'⛔':tipo==='warn'?'▲':tipo==='reinicio'?'⟳':'●',
+      msg:a.mensaje||a.tipo, conteo:a.conteo }; });
+  // sumar "sin señal" como eventos derivados
+  (cols||[]).forEach(c=>{ if(c.ts && !enLinea(c)) ev.push({ ts:c.ts, tipo:'offline', k:'mute', dev:c.device, ic:'○', msg:`${c.nombre} sin señal` }); });
+  return ev.sort((a,b)=>b.ts-a.ts);
+}
+
+// ── render ──
+function pintar(){ renderKpis(); llenarFiltroCollar(); render(); renderTimeline(); document.getElementById('foot').textContent = `Lindero · consola de pruebas — ${DEMO?'datos de ejemplo':'datos en vivo'} · actualizado ${new Date().toLocaleTimeString('es-MX')}`; }
+function conState(live, txt){ const d=document.getElementById('conn-dot'), t=document.getElementById('conn-txt');
+  d.className='dot '+(DEMO?'demo':live?'live':''); t.textContent = txt; }
+
+function renderKpis(){
+  const n=collares.length, enL=collares.filter(enLinea).length, sinS=n-enL;
+  const alerta=collares.filter(c=>enLinea(c)&&(c.estado==='warn'||c.estado==='shock')).length;
+  const bats=collares.map(c=>c.bateria).filter(x=>x!=null); const batProm=bats.length?Math.round(bats.reduce((a,b)=>a+b,0)/bats.length):null;
+  const ents=collares.map(c=>c.entrega).filter(x=>x!=null); const entProm=ents.length?Math.round(ents.reduce((a,b)=>a+b,0)/ents.length):null;
+  const tiles=[
+    {l:'Collares',v:n,c:''},
+    {l:'En línea',v:enL,c:'accent'},
+    {l:'Sin señal',v:sinS,c:sinS?'mute':''},
+    {l:'En alerta',v:alerta,c:alerta?'bad':''},
+    {l:'Batería prom',v:batProm==null?'—':batProm,u:'%',c:batProm==null?'':batProm<20?'bad':batProm<50?'warn':'accent'},
+    {l:'Entrega prom',v:entProm==null?'—':entProm,u:'%',c:entProm==null?'':entProm<80?'warn':'accent'},
+  ];
+  document.getElementById('kpis').innerHTML = tiles.map(t=>`<div class="kpi ${t.c}"><div class="k-edge"></div><div class="k-lbl">${t.l}</div><div class="k-val">${t.v}${t.u?`<small>${t.u}</small>`:''}</div></div>`).join('');
+}
+function llenarFiltroCollar(){ const s=document.getElementById('f-collar'); const cur=s.value;
+  s.innerHTML='<option value="">Todos</option>'+collares.map(c=>`<option value="${esc(c.device)}">${esc(c.nombre)}</option>`).join(''); s.value=cur; }
+
+function riesgoScore(c){ if(!enLinea(c))return 3; if(c.estado==='shock')return 4; if(c.estado==='warn')return 2;
+  if((c.bateria??100)<20)return 2.5; return 0; }
+function render(){
+  const fc=document.getElementById('f-collar').value, ord=document.getElementById('f-orden').value;
+  let list=collares.filter(c=>!fc||c.device===fc);
+  list.sort((a,b)=> ord==='nombre'?a.nombre.localeCompare(b.nombre)
+    : ord==='bateria'?(a.bateria??999)-(b.bateria??999)
+    : ord==='senal'?(a.rssi??-999)-(b.rssi??-999)
+    : riesgoScore(b)-riesgoScore(a));
+  const g=document.getElementById('grid');
+  if(!list.length){ g.innerHTML='<p class="empty">No hay collares que mostrar.</p>'; return; }
+  g.innerHTML=list.map(cardHTML).join('');
+}
+function cardHTML(c){
+  const st=estadoCollar(c), hd=nivelHdop(c.hdop), bt=nivelBat(c.bateria), rs=nivelRssi(c.rssi), sn=nivelSnr(c.snr);
+  const carga = c.carga===1?'⚡ cargando':c.carga===2?'a batería':c.carga===0?'estable':'—';
+  const mov = c.movimiento? 'en movimiento':'en reposo';
+  const dist = c.dist!=null && c.dist<9000 ? Math.round(c.dist)+' m' : '—';
+  const vd = veredictos[c.device]||'';
+  return `<div class="card st-${st.k}">
+    <div class="c-head">
+      <div><div class="c-name">${esc(c.nombre)}</div><div class="c-dev mono">${esc(c.device)}${c.lote?' · '+esc(c.lote):''}</div></div>
+      <div class="right">
+        <span class="pill ${st.k}">${st.ic} ${st.txt}</span>
+        <span class="fw">${c.firmware?('fw '+esc(c.firmware)):''} ${enLinea(c)?'· '+haceTxt(c.ts):'· '+haceTxt(c.ts)}</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="m"><div class="m-lbl">Precisión GPS</div><div class="m-val ${hd.k}">${c.hdop!=null?c.hdop.toFixed(1):'—'}<span class="q">HDOP · ${hd.q||'—'}</span></div></div>
+      <div class="m"><div class="m-lbl">Satélites</div><div class="m-val ${c.sats>=6?'ok':c.sats!=null?'warn':'mute'}">${c.sats??'—'}<span class="q">${c.speed!=null?c.speed.toFixed(1)+' km/h':''}</span></div></div>
+      <div class="m"><div class="m-lbl">Señal LoRa (RSSI)</div><div class="m-val ${rs.k}">${c.rssi??'—'}<span class="q">dBm · ${rs.q||'—'}</span></div>${meter(pctRssi(c.rssi),rs.k)}</div>
+      <div class="m"><div class="m-lbl">Calidad (SNR)</div><div class="m-val ${sn.k}">${c.snr??'—'}<span class="q">dB · ${sn.q||'—'}</span></div>${meter(pctSnr(c.snr),sn.k)}</div>
+      <div class="m"><div class="m-lbl">Batería</div><div class="m-val ${bt.k}">${c.bateria??'—'}<span class="q">% · ${esc(carga)}</span></div>${meter(c.bateria??0,bt.k)}</div>
+      <div class="m"><div class="m-lbl">Distancia al límite</div><div class="m-val">${dist}<span class="q">${esc(mov)}</span></div></div>
+    </div>
+    ${c.batSerie&&c.batSerie.length>1?`<div class="m-lbl" style="margin-bottom:1px">Batería (histórico)</div>`+sparkline(c.batSerie,'var(--accent)'):''}
+    <div class="counters">
+      <span class="chip">estímulos <b>${c.shock_pwr!=null&&c.estado==='shock'?'activo':'0'}</b></span>
+      <span class="chip ${c.reinicios?'warm':''}">reinicios <b>${c.reinicios??0}</b></span>
+      <span class="chip ${c.bloqueado?'hot':''}">bienestar <b>${c.bloqueado?'BLOQ':'ok'}</b></span>
+    </div>
+    <div class="c-actions">
+      <button class="btn sm" onclick="verRecorrido('${esc(c.device)}')">📍 Recorrido</button>
+      <button class="btn sm" onclick="descargar('${esc(c.device)}')">⬇ CSV</button>
+      <span class="verdict">
+        <button class="vbtn ok ${vd==='ok'?'on':''}" title="Prueba exitosa" onclick="veredicto('${esc(c.device)}','ok')">✓</button>
+        <button class="vbtn bad ${vd==='bad'?'on':''}" title="Prueba fallida" onclick="veredicto('${esc(c.device)}','bad')">✗</button>
+      </span>
+    </div>
+  </div>`;
+}
+function renderTimeline(){
+  const f=document.getElementById('f-evento').value;
+  const list=eventos.filter(e=>!f||e.tipo===f).slice(0,60);
+  const tl=document.getElementById('timeline');
+  if(!list.length){ tl.innerHTML='<p class="empty">Sin eventos.</p>'; return; }
+  tl.innerHTML=list.map(e=>{
+    const c=collares.find(x=>x.device===e.dev);
+    return `<div class="ev ${e.k}"><div class="ic">${e.ic}</div><div class="body">
+      <div class="t1"><b>${esc(c?c.nombre:e.dev||'—')}</b> — ${esc(e.msg)}${e.conteo>1?` ×${e.conteo}`:''}</div>
+      <div class="t2">${new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · ${haceTxt(e.ts)}</div>
+    </div></div>`; }).join('');
+}
+
+// ── acciones ──
+function veredicto(dev,v){ veredictos[dev]=veredictos[dev]===v?'':v; try{localStorage.setItem('lindero_veredictos',JSON.stringify(veredictos));}catch(e){} render(); }
+function verRecorrido(dev){ location.href = 'index.html'; }
+function descargar(dev){ exportarCSV(dev); }
+function exportarCSV(dev){
+  const rows=collares.filter(c=>!dev||c.device===dev);
+  const cols=['device','nombre','estado','en_linea','hdop','sats','rssi','snr','bateria','carga','dist_borde','firmware','reinicios','bloqueado','ultima_com'];
+  const linea=r=>[r.device,r.nombre,r.estado,enLinea(r),r.hdop,r.sats,r.rssi,r.snr,r.bateria,r.carga,r.dist,r.firmware,r.reinicios,r.bloqueado, r.ts?new Date(r.ts).toISOString():''];
+  const csv=[cols.join(',')].concat(rows.map(r=>linea(r).map(v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(','))).join('\n');
+  const b=new Blob([csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a');
+  a.href=u; a.download=`estado_collares_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+}
+function toggleAuto(){ AUTO=!AUTO; document.getElementById('btn-auto').textContent=AUTO?'⏸ Auto':'▶ Auto'; programarAuto(); }
+function programarAuto(){ clearInterval(autoTimer); if(AUTO) autoTimer=setInterval(cargar, 10000); }
+
+// ── datos demo (para diseñar/previsualizar sin backend) ──
+function usarDemo(msg){
+  DEMO=true; conState(false, 'Datos de ejemplo'); document.getElementById('conn-txt').textContent='Datos de ejemplo';
+  const now=Date.now();
+  const serie=(base,drift)=>Array.from({length:16},(_,i)=>Math.round(clamp(base+drift*i+(i%3-1)*1.5,0,100)));
+  collares=[
+    {device:'collar_01',nombre:'Aurora',lote:'Lote norte',lat:26.895,lng:-102.0,estado:'ok',ts:now-20000,sats:11,hdop:0.8,snr:6,rssi:-58,speed:0.4,movimiento:false,bateria:86,carga:1,dist:340,firmware:'7.2',reinicios:0,bloqueado:false,shock_pwr:200,entrega:98,uptime:2880,batSerie:serie(84,0.1)},
+    {device:'collar_02',nombre:'Bruno',lote:'Lote norte',lat:26.89,lng:-101.99,estado:'warn',ts:now-45000,sats:8,hdop:1.9,snr:-3,rssi:-88,speed:3.1,movimiento:true,bateria:41,carga:2,dist:9,firmware:'7.2',reinicios:1,bloqueado:false,shock_pwr:200,entrega:91,uptime:1440,batSerie:serie(52,-0.7)},
+    {device:'collar_03',nombre:'Canela',lote:'Lote sur',lat:26.888,lng:-101.985,estado:'shock',ts:now-30000,sats:9,hdop:1.2,snr:1,rssi:-95,speed:5.2,movimiento:true,bateria:18,carga:2,dist:24,firmware:'7.2',reinicios:3,bloqueado:false,shock_pwr:200,entrega:74,uptime:600,batSerie:serie(30,-0.8)},
+    {device:'collar_04',nombre:'Diego',lote:'Lote sur',lat:26.9,lng:-102.01,estado:'ok',ts:now-3*3600*1000,sats:0,hdop:null,snr:null,rssi:null,speed:null,movimiento:false,bateria:63,carga:0,dist:null,firmware:'7.1',reinicios:5,bloqueado:true,shock_pwr:200,entrega:40,uptime:120,batSerie:serie(70,-0.4)},
+  ];
+  eventos=[
+    {ts:now-30000,tipo:'shock',k:'bad',dev:'collar_03',ic:'⛔',msg:'Canela cruzó la cerca',conteo:1},
+    {ts:now-45000,tipo:'warn',k:'warn',dev:'collar_02',ic:'▲',msg:'Bruno se acercó al límite (9m)',conteo:2},
+    {ts:now-900000,tipo:'reinicio',k:'info',dev:'collar_04',ic:'⟳',msg:'Diego: reinicio anormal (brownout)'},
+    {ts:now-3*3600*1000,tipo:'offline',k:'mute',dev:'collar_04',ic:'○',msg:'Diego sin señal'},
+  ];
+  if(msg) document.getElementById('foot').textContent=msg;
+  pintar();
+}
+
+// init
+try{ veredictos=JSON.parse(localStorage.getItem('lindero_veredictos')||'{}'); }catch(e){ veredictos={}; }
+cargar(); programarAuto();
+// PWA: mismo service worker que el panel (solo HTTPS/localhost).
+if ('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) {
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{}));
+}
+window.addEventListener('online', cargar);
+</script>
+</body>
+</html>

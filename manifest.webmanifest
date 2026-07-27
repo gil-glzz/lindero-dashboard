@@ -1,0 +1,19 @@
+{
+  "name": "Lindero — Cercas digitales",
+  "short_name": "Lindero",
+  "description": "Panel de cercas virtuales y monitoreo de collares para ganado.",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1410",
+  "theme_color": "#0d1410",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Consola de pruebas", "short_name": "Pruebas", "url": "pruebas.html" }
+  ]
+}

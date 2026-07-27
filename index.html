@@ -3,9 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self'; manifest-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://cdnjs.cloudflare.com https://server.arcgisonline.com https://*.google.com https://tile.openstreetmap.org https://*.openstreetmap.org; connect-src 'self' https://collar-gps-server.onrender.com; object-src 'none'; base-uri 'self'">
 <title>Lindero — Panel de cercas digitales</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.css"/>
+<meta name="theme-color" content="#0d1410">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lindero">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" integrity="sha512-gc3xjCmIy673V6MyOAZhIW93xhM9ei1I+gLbmFjUHIjocENRsLX/QUE1htk5q1XV2D/iie/VQ8DXI6Vu8bexvQ==" crossorigin="anonymous"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -320,10 +328,12 @@
     </div>
   </div>
   <div class="header-stats">
+    <span id="arreo-chip" onclick="showTab('arreo'); document.getElementById('sidebar').classList.add('abierto');" style="display:none; cursor:pointer; background:#3b2f0e; border:1px solid #a16207; color:#fbbf24; font-size:11px; font-weight:700; padding:5px 10px; border-radius:20px; margin-right:8px; white-space:nowrap;">🐄 ARREO</span>
     <div class="hstat"><div class="num" id="stat-animales">0</div><div class="lbl">animales</div></div>
     <div class="hstat"><div class="num" id="stat-lotes">0</div><div class="lbl">lotes</div></div>
     <div class="hstat"><div class="num" style="color:var(--accent)" id="stat-dentro">0</div><div class="lbl">dentro</div></div>
     <div class="hstat"><div class="num" style="color:var(--danger)" id="stat-alertas">0</div><div class="lbl">alertas</div></div>
+    <div class="hstat"><div class="num" style="color:var(--text-dim)" id="stat-sinsenal">0</div><div class="lbl">sin señal</div></div>
     <div style="position:relative;">
       <button onclick="toggleAlertas()" title="Alertas" style="position:relative; background:transparent; border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:16px; margin-left:8px;">
         🔔
@@ -341,6 +351,7 @@
         <div id="reporte-contenido" style="padding:14px; font-size:13px;"></div>
       </div>
     </div>
+    <a href="pruebas.html" title="Consola de pruebas de campo" style="text-decoration:none; background:transparent; border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:16px; margin-left:8px; display:inline-flex; align-items:center;">🩺</a>
     <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto; padding:6px 14px; font-size:12px; margin-left:8px;">Salir</button>
   </div>
 </header>
@@ -355,6 +366,8 @@
       <button class="sidebar-tab" onclick="showTab('cercas')">Cercas</button>
       <button class="sidebar-tab" onclick="showTab('animales')">Animales</button>
       <button class="sidebar-tab" onclick="showTab('agua')">Agua</button>
+      <button class="sidebar-tab" onclick="showTab('infra')">Infra</button>
+      <button class="sidebar-tab" onclick="showTab('arreo')">Arreo</button>
     </div>
     <div class="sidebar-content scroll-thin">
 
@@ -395,11 +408,22 @@
           <input id="cerca-nombre" placeholder="Ej: Potrero norte"/>
         </div>
         <div class="field">
-          <label>Tipo de cerca</label>
+          <label>Categoría</label>
+          <select id="cerca-categoria" onchange="aplicarCategoriaCerca()">
+            <option value="potrero">🌿 Potrero</option>
+            <option value="prohibida">⛔ Zona prohibida</option>
+            <option value="corredor">↔️ Corredor</option>
+            <option value="alimentacion">🌾 Zona de alimentación</option>
+            <option value="manejo">🛠️ Área de manejo</option>
+            <option value="referencia">👁️ Referencia visual</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tipo de cerca (comportamiento del collar)</label>
           <select id="cerca-tipo" onchange="toggleHoras()">
-            <option value="permanente">Permanente</option>
+            <option value="permanente">Permanente (contiene)</option>
             <option value="temporal">Temporal</option>
-            <option value="exclusion">Exclusión (prohibida)</option>
+            <option value="exclusion">Exclusión (mantiene fuera)</option>
             <option value="simbolica">Simbólica (solo visual)</option>
           </select>
         </div>
@@ -408,8 +432,12 @@
           <input id="cerca-horas" type="number" value="6" min="1" max="72"/>
         </div>
         <div class="field">
+          <label>Distancia de aviso (m)</label>
+          <input id="cerca-warn" type="number" value="10" min="2" max="200"/>
+        </div>
+        <div class="field">
           <p id="cerca-aviso-texto" style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel); padding:10px 12px; border-radius:8px; margin:0;">
-            🔔 El buzzer empezará a avisar cuando el animal esté a <strong>10 metros</strong> del borde, más fuerte conforme se acerca.
+            🔔 El buzzer empezará a avisar a la distancia de aviso del borde, más fuerte conforme se acerca.
           </p>
         </div>
         <button class="btn btn-primary" id="btn-draw-toggle" onclick="toggleDraw()">
@@ -438,12 +466,53 @@
         </button>
       </div>
 
+      <!-- MODO ARREO (v6) -->
+      <div id="pane-arreo" style="display:none">
+        <p class="sec-title">Modo arreo 🐄</p>
+        <div id="arreo-activo-card" style="display:none"></div>
+        <div id="arreo-form">
+          <div class="field">
+            <label>Potrero destino (recomendado)</label>
+            <select id="arreo-destino">
+              <option value="">Sin destino — solo por tiempo</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Duración máxima</label>
+            <select id="arreo-duracion">
+              <option value="30">30 minutos</option>
+              <option value="60" selected>1 hora</option>
+              <option value="120">2 horas</option>
+              <option value="240">4 horas</option>
+            </select>
+          </div>
+          <p style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel); padding:10px 12px; border-radius:8px; margin:0 0 12px 0;">
+            Durante el arreo los collares <strong>no aplican estímulo ni buzzer</strong>.
+            Con destino, cada collar vuelve a contención automáticamente al entrar
+            al potrero. <strong>Espera a que los collares confirmen</strong> (tarda
+            hasta ~1 min) antes de empezar a mover el ganado.
+          </p>
+          <button class="btn btn-primary" onclick="iniciarArreo()">Iniciar arreo</button>
+        </div>
+      </div>
+
       <!-- EDITAR CERCA -->
       <div id="pane-editcerca" style="display:none">
         <p class="sec-title">Editar cerca</p>
         <div class="field">
           <label>Nombre del potrero</label>
           <input id="ec-nombre"/>
+        </div>
+        <div class="field">
+          <label>Categoría</label>
+          <select id="ec-categoria">
+            <option value="potrero">🌿 Potrero</option>
+            <option value="prohibida">⛔ Zona prohibida</option>
+            <option value="corredor">↔️ Corredor</option>
+            <option value="alimentacion">🌾 Zona de alimentación</option>
+            <option value="manejo">🛠️ Área de manejo</option>
+            <option value="referencia">👁️ Referencia visual</option>
+          </select>
         </div>
         <div class="field">
           <label>Tipo de cerca</label>
@@ -455,6 +524,10 @@
           </select>
         </div>
         <div class="field">
+          <label>Distancia de aviso (m)</label>
+          <input id="ec-warn" type="number" value="10" min="2" max="200"/>
+        </div>
+        <div class="field">
           <label>Color de la cerca</label>
           <div class="color-picker" id="ec-colors"></div>
         </div>
@@ -462,8 +535,9 @@
           ✎ Editar forma (arrastrar puntos)
         </button>
         <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px; line-height:1.5">
-          Arrastra los puntos de colores para mover las esquinas. Toca el borde de la cerca para agregar un punto nuevo. Doble clic en un punto para quitarlo.
+          Arrastra los puntos de colores para mover las esquinas; la manija <b>✥</b> del centro mueve la cerca completa. Toca el borde para agregar un punto. Doble clic en un punto para quitarlo.
         </p>
+        <button class="btn" onclick="duplicarCerca()" style="margin-bottom:8px">⧉ Duplicar cerca</button>
         <button class="btn btn-primary" onclick="guardarEdicionCerca()">Guardar cambios</button>
         <button class="btn btn-ghost" onclick="cancelarEdicionCerca()" style="margin-top:8px">Cancelar</button>
       </div>
@@ -484,11 +558,41 @@
           Marca dónde hay un lago, tanque o pozo. El sistema contará cuántas veces tus animales se acercan a beber a cada uno.
         </p>
         <div id="aguajes-list"></div>
-        <button class="btn btn-primary" id="btn-agua-toggle" onclick="toggleColocarAguaje()" style="margin-top:8px">
-          💧 Marcar aguaje en el mapa
+        <div class="field" style="margin-top:12px;">
+          <label>Nombre del nuevo aguaje</label>
+          <input id="agua-nombre" placeholder="Ej: Pozo norte, Tanque grande" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text);">
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Radio (m)</label>
+          <input id="agua-radio" type="number" value="30" min="1" max="500" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text);">
+        </div>
+        <button class="btn btn-primary" id="btn-agua-toggle" onclick="toggleColocarAguaje()" style="margin-top:10px">
+          💧 Marcar aguajes en el mapa
         </button>
         <p id="agua-hint" style="font-size:12px; color:var(--accent); margin-top:10px; display:none; line-height:1.5;">
-          Toca el mapa donde está el aguaje.
+          Toca el mapa para cada aguaje (puedes marcar varios). Arrastra un 💧 para reubicarlo. Pulsa <b>✓ Listo</b> al terminar.
+        </p>
+      </div>
+
+      <!-- INFRAESTRUCTURA (gateways, antenas, corrales, puertas, saladeros…) -->
+      <div id="pane-infra" style="display:none">
+        <p class="sec-title">Infraestructura del rancho</p>
+        <p style="font-size:12px; color:var(--text-dim); line-height:1.5; margin-bottom:12px;">
+          Ubica gateways, antenas, corrales, puertas, saladeros, paneles y más. Es solo visual: no afecta la cerca.
+        </p>
+        <div id="infra-filtro" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;"></div>
+        <div id="infra-list"></div>
+        <div class="field" style="margin-top:12px;">
+          <label>Tipo</label>
+          <select id="infra-tipo" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface,#111); color:var(--text);"></select>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Nombre</label>
+          <input id="infra-nombre" placeholder="Ej: Gateway casa, Corral norte" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text);">
+        </div>
+        <button class="btn btn-primary" id="btn-infra-toggle" onclick="toggleColocarInfra()" style="margin-top:10px">📍 Marcar en el mapa</button>
+        <p id="infra-hint" style="font-size:12px; color:var(--accent); margin-top:10px; display:none; line-height:1.5;">
+          Toca el mapa para colocar (puedes marcar varios). Arrastra un marcador para moverlo. Pulsa <b>✓ Listo</b> al terminar.
         </p>
       </div>
 
@@ -529,17 +633,22 @@
         <div class="modal-stat"><div class="lbl">Batería collar</div><div class="val" id="modal-bateria">—</div></div>
       </div>
 
-      <p class="sec-title" style="margin-top:4px">Datos en vivo del collar</p>
+      <p class="sec-title" style="margin-top:4px">Datos en vivo del collar<span id="modal-frescura" style="font-weight:400;font-size:12px;color:var(--text-dim)"></span></p>
       <div class="modal-grid" style="margin-bottom:16px">
         <div class="modal-stat"><div class="lbl">Última conexión</div><div class="val" id="modal-ultcon" style="font-size:14px">—</div></div>
         <div class="modal-stat"><div class="lbl">Distancia al borde</div><div class="val" id="modal-distborde">—</div></div>
         <div class="modal-stat"><div class="lbl">Satélites GPS</div><div class="val" id="modal-sats">—</div></div>
-        <div class="modal-stat"><div class="lbl">Señal LoRa</div><div class="val" id="modal-rssi">—</div></div>
+        <div class="modal-stat"><div class="lbl">Precisión (HDOP)</div><div class="val" id="modal-hdop">—</div></div>
+        <div class="modal-stat"><div class="lbl">Señal LoRa (RSSI)</div><div class="val" id="modal-rssi">—</div></div>
+        <div class="modal-stat"><div class="lbl">Calidad LoRa (SNR)</div><div class="val" id="modal-snr">—</div></div>
+        <div class="modal-stat"><div class="lbl">Reinicios anormales</div><div class="val" id="modal-reinicios">—</div></div>
+        <div class="modal-stat"><div class="lbl">Firmware</div><div class="val" id="modal-firmware">—</div></div>
       </div>
 
       <div class="field"><label>Arete / ID</label><div id="modal-arete" style="font-size:14px">—</div></div>
       <div class="field"><label>Notas sanitarias</label><div id="modal-notas" style="font-size:14px; line-height:1.5">—</div></div>
       <button class="btn btn-primary" onclick="verRecorrido()" style="margin-top:8px">📍 Ver recorrido en el mapa</button>
+      <button class="btn" onclick="descargarRecorridoCSV()" style="margin-top:8px">⬇️ Descargar recorrido (CSV)</button>
       <button class="btn" onclick="editarAnimal()" style="margin-top:8px">Editar perfil</button>
     </div>
 
@@ -570,8 +679,8 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" integrity="sha512-ozq8xQKq6urvuU6jNgkfqAmT7jKN2XumbrX1JiB3TnF7tI48DPI4Gy1GXKD/V3EExgAs1V+pRO7vwtS1LHg0Gw==" crossorigin="anonymous"></script>
 <script>
 // ════════════════════════════════════════════════════════════
 //  CONFIGURACIÓN
@@ -611,6 +720,17 @@ async function authFetch(url, options = {}) {
     document.getElementById('login-screen').style.display = 'flex';
   }
   return res;
+}
+
+// Escapa HTML para interpolar datos de la API/usuario en plantillas sin XSS.
+// Úsalo en TODA interpolación de datos dentro de innerHTML/popups/tooltips.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+// Valida un color de la API antes de usarlo en style (evita inyección por atributo).
+function safeColor(c, fallback = '#4ade80') {
+  return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : fallback;
 }
 
 async function hacerLogin() {
@@ -765,8 +885,8 @@ async function listarCuentas() {
       const cont = document.getElementById('lista-cuentas');
       cont.innerHTML = cuentas.length
         ? cuentas.map(u => `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
-            <div><strong>${u.rancho}</strong><br><span style="color:var(--text-dim)">${u.correo}</span></div>
-            <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="borrarCuenta(${u.id}, '${u.rancho.replace(/'/g,"\\'")}')">Borrar</button>
+            <div><strong>${esc(u.rancho)}</strong><br><span style="color:var(--text-dim)">${esc(u.correo)}</span></div>
+            <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="borrarCuenta(${u.id}, ${esc(JSON.stringify(u.rancho))})">Borrar</button>
           </div>`).join('')
         : '<p style="color:var(--text-dim)">No hay cuentas aún.</p>';
     }
@@ -807,10 +927,10 @@ async function listarCollaresAsignados() {
         ? collares.map(c => `
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
               <div>
-                <strong>${c.device}</strong><br>
-                <span style="color:var(--text-dim)">${c.rancho || '(rancho sin nombre)'} — ${c.dueno}</span>
+                <strong>${esc(c.device)}</strong><br>
+                <span style="color:var(--text-dim)">${esc(c.rancho || '(rancho sin nombre)')} — ${esc(c.dueno)}</span>
               </div>
-              <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="quitarAsignacionCollar('${c.device}')">Quitar</button>
+              <button class="btn" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" onclick="quitarAsignacionCollar(${esc(JSON.stringify(c.device))})">Quitar</button>
             </div>`).join('')
         : '<p style="color:var(--text-dim)">Ningún collar asignado todavía.</p>';
     } else {
@@ -843,8 +963,10 @@ async function quitarAsignacionCollar(device) {
 const PALETA = ['#4ade80','#f87171','#fbbf24','#60a5fa','#c084fc','#fb923c','#2dd4bf','#f472b6'];
 
 // Centro inicial — ajustar al rancho real
-const CENTRO = [25.6866, -100.3161]; // Monterrey aprox como ejemplo
-const ZOOM = 14;
+// Default provisional (solo hasta que carguen tus datos): zona de Cuatro Ciénegas, Coahuila.
+// El mapa se re-encuadra a TUS cercas/collares/aguajes en el primer cargue (ver encuadrarTodo).
+const CENTRO = [26.9895, -102.0630];
+const ZOOM = 12;
 
 // ════════════════════════════════════════════════════════════
 //  ESTADO
@@ -869,6 +991,22 @@ let tempMarkers = [];
 // ════════════════════════════════════════════════════════════
 const map = L.map('map', { zoomControl: false }).setView(CENTRO, ZOOM);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Encuadra el mapa a TODO lo del rancho (cercas + collares + aguajes). Se llama una vez
+// en el primer cargue con datos, para que abra en tus cercas y no en el punto por defecto.
+function encuadrarTodo() {
+  try { map.invalidateSize(); } catch(e) {}
+  // Si el contenedor aún no tiene tamaño (login encima, mapa sin layout), fitBounds no
+  // haría nada: devolvemos false para reintentar en el próximo cargue (ya con el mapa visible).
+  if (!map.getSize || map.getSize().x < 60) return false;
+  const pts = [];
+  (typeof cercas !== 'undefined' ? cercas : []).forEach(c =>
+    (c.poligono || []).forEach(p => { if (p && p.lat != null && p.lng != null) pts.push([Number(p.lat), Number(p.lng)]); }));
+  (typeof animales !== 'undefined' ? animales : []).forEach(a => { if (a.lat != null && a.lng != null) pts.push([Number(a.lat), Number(a.lng)]); });
+  (typeof aguajes !== 'undefined' ? aguajes : []).forEach(a => { if (a.lat != null && a.lng != null) pts.push([Number(a.lat), Number(a.lng)]); });
+  if (!pts.length) return false;
+  try { map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16, animate: false }); return true; } catch(e) { return false; }
+}
 
 // Proveedores satelitales — el usuario puede alternar si uno no carga bien
 const SAT_PROVIDERS = {
@@ -922,6 +1060,43 @@ let cercaLayers = {};
 let aguajes = [];
 let aguajeLayers = {};
 let colocandoAguaje = false;
+// Infraestructura del rancho (capa visual, 2026-07-24)
+let instalaciones = [];
+let instalacionLayers = {};
+let colocandoInfra = false;
+const infraOculto = new Set();     // tipos ocultos por el filtro
+const TIPOS_INFRA = {
+  camara:         { label: 'Cámara',            icono: '📷' },
+  antena:         { label: 'Antena base',       icono: '📡' },
+  gateway:        { label: 'Gateway LoRa',      icono: '📶' },
+  torre:          { label: 'Torre/repetidor',   icono: '🗼' },
+  starlink:       { label: 'Starlink',          icono: '🛰️' },
+  panel_solar:    { label: 'Panel solar',       icono: '☀️' },
+  bebedero:       { label: 'Bebedero',          icono: '🥤' },
+  pozo:           { label: 'Pozo',              icono: '🕳️' },
+  tanque:         { label: 'Tanque de agua',    icono: '🛢️' },
+  corral:         { label: 'Corral',            icono: '🐄' },
+  puerta:         { label: 'Puerta',            icono: '🚪' },
+  saladero:       { label: 'Saladero',          icono: '🧂' },
+  comedero:       { label: 'Comedero',          icono: '🌾' },
+  estacion_meteo: { label: 'Estación meteo',    icono: '🌦️' },
+  mantenimiento:  { label: 'Mantenimiento',     icono: '🔧' },
+  sin_cobertura:  { label: 'Zona sin cobertura', icono: '📵' },
+  referencia:     { label: 'Referencia',        icono: '📍' },
+};
+function infraIcono(t) { return (TIPOS_INFRA[t] || TIPOS_INFRA.referencia).icono; }
+function infraLabel(t) { return (TIPOS_INFRA[t] || TIPOS_INFRA.referencia).label; }
+// Categorías SEMÁNTICAS de cerca (2026-07-24). Cosmética/organizativa: color e icono
+// sugeridos + el TIPO de enforcement por defecto. El collar solo ve 'tipo'.
+const CATEGORIAS_CERCA = {
+  potrero:      { label: 'Potrero',              icono: '🌿', tipoDefault: 'permanente', color: '#4ade80' },
+  prohibida:    { label: 'Zona prohibida',       icono: '⛔', tipoDefault: 'exclusion',  color: '#f87171' },
+  corredor:     { label: 'Corredor',             icono: '↔️', tipoDefault: 'permanente', color: '#facc15' },
+  alimentacion: { label: 'Zona de alimentación', icono: '🌾', tipoDefault: 'simbolica',  color: '#fb923c' },
+  manejo:       { label: 'Área de manejo',       icono: '🛠️', tipoDefault: 'simbolica',  color: '#a78bfa' },
+  referencia:   { label: 'Referencia visual',    icono: '👁️', tipoDefault: 'simbolica',  color: '#9ca3af' },
+};
+function catCerca(c) { return CATEGORIAS_CERCA[c] || CATEGORIAS_CERCA.potrero; }
 
 // ¿El collar está reportando? (en línea si reportó hace < 5 min)
 const UMBRAL_EN_LINEA_MS = 5 * 60 * 1000;   // 5 minutos
@@ -942,12 +1117,12 @@ function renderAnimales() {
     const opacidad = enLinea ? '1' : '0.5';
     const icon = L.divIcon({
       className: '',
-      html: `<div class="animal-marker" style="width:18px;height:18px;background:${color};border-color:${borderColor};opacity:${opacidad}"></div>`,
+      html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};opacity:${opacidad}"></div>`,
       iconSize: [18,18], iconAnchor: [9,9]
     });
     const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
     m.on('click', () => abrirPerfilAnimal(a.id));
-    m.bindTooltip(a.nombre + (enLinea ? '' : ' (sin señal)'), { direction: 'top', offset: [0,-10] });
+    m.bindTooltip(esc(a.nombre) + (enLinea ? '' : ' (sin señal)'), { direction: 'top', offset: [0,-10] });
     animalMarkers[a.id] = m;
   });
 }
@@ -960,15 +1135,16 @@ function renderCercas() {
     const esSimbolica = c.tipo === 'simbolica';
     const latlngs = c.poligono.map(p => [p.lat, p.lng]);
     const poly = L.polygon(latlngs, {
-      color: esSimbolica ? '#9ca3af' : c.color,
-      fillColor: c.color,
+      color: esSimbolica ? '#9ca3af' : safeColor(c.color),
+      fillColor: safeColor(c.color),
       fillOpacity: esSimbolica ? 0 : (activa ? 0.15 : 0.04),
       weight: 2,
       opacity: activa ? 1 : 0.4,
       dashArray: esSimbolica ? '1 5' : (!activa ? '4 8' : (c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null))
     }).addTo(map);
-    let popup = `<b>${c.nombre}</b><br>${c.tipo}${activa ? '' : ' · inactiva'}`;
-    if (esSimbolica) popup = `<b>${c.nombre}</b><br>cerca simbólica (solo referencia)`;
+    const cat = catCerca(c.categoria);
+    let popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · ${esc(c.tipo)}${activa ? '' : ' · inactiva'}`;
+    if (esSimbolica) popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · solo referencia visual`;
     if (c.expiraEn) {
       const ms = c.expiraEn - Date.now();
       const h = Math.max(0, Math.floor(ms/3600000));
@@ -1011,6 +1187,11 @@ map.on('click', (e) => {
     crearAguajeEn(e.latlng.lat, e.latlng.lng);
     return;
   }
+  // Si estamos colocando infraestructura, el clic la crea
+  if (colocandoInfra) {
+    crearInstalacionEn(e.latlng.lat, e.latlng.lng);
+    return;
+  }
   if (!drawingMode) return;
   currentPolyPts.push([e.latlng.lat, e.latlng.lng]);
   const m = L.circleMarker(e.latlng, { radius: 5, color: '#4ade80', fillColor:'#4ade80', fillOpacity:1 }).addTo(map);
@@ -1050,13 +1231,20 @@ function guardarCercaActual() {
   const loteId = parseInt(document.getElementById('cerca-lote').value);
   const lote = lotes.find(l => l.id === loteId);
   const tipo = document.getElementById('cerca-tipo').value;
+  const categoria = document.getElementById('cerca-categoria')?.value || 'potrero';
   const horas = parseInt(document.getElementById('cerca-horas').value) || 6;
+  let warnDist = parseInt(document.getElementById('cerca-warn')?.value, 10);
+  if (!Number.isFinite(warnDist) || warnDist < 2 || warnDist > 200) warnDist = 10;
   const cerca = {
     id: Date.now(),
-    nombre: document.getElementById('cerca-nombre').value || 'Potrero',
+    nombre: document.getElementById('cerca-nombre').value || catCerca(categoria).label,
     tipo,
-    color: tipo === 'exclusion' ? '#f87171' : (lote ? lote.color : '#4ade80'),
-    warn_dist_m: 10,
+    categoria,
+    // Color: prohibida siempre roja; potrero hereda el color del lote; el resto, el de su categoría.
+    color: tipo === 'exclusion' ? '#f87171'
+         : (categoria === 'potrero' && lote) ? lote.color
+         : catCerca(categoria).color,
+    warn_dist_m: warnDist,
     poligono: currentPolyPts.map(p => ({ lat: p[0], lng: p[1] })),
     collares: animales.filter(a => a.lote === loteId).map(a => a.collar),
     expiraEn: tipo === 'temporal' ? Date.now() + horas*3600000 : null
@@ -1082,6 +1270,8 @@ function guardarCercaActual() {
 function abrirNuevaCerca() {
   document.getElementById('cerca-nombre').value = '';
   document.getElementById('cerca-tipo').value = 'permanente';
+  const selCat = document.getElementById('cerca-categoria'); if (selCat) selCat.value = 'potrero';
+  const inW = document.getElementById('cerca-warn'); if (inW) inW.value = 10;
   if (typeof toggleHoras === 'function') toggleHoras();
   refreshCercaLoteSelect();
   // limpiar cualquier dibujo previo
@@ -1116,7 +1306,7 @@ function cancelarNuevaCerca() {
 
 async function enviarCercaAlServidor(cerca) {
   const payload = {
-    nombre: cerca.nombre, tipo: cerca.tipo,
+    nombre: cerca.nombre, tipo: cerca.tipo, categoria: cerca.categoria || 'potrero',
     poligono: cerca.poligono, warn_dist_m: cerca.warn_dist_m,
     color: cerca.color, collares: cerca.collares,
     ...(cerca.tipo === 'temporal' ? { horas: Math.round((cerca.expiraEn - Date.now())/3600000) } : {})
@@ -1153,16 +1343,18 @@ function renderLotes() {
   cont.innerHTML = lotes.map(l => {
     const enLote = animales.filter(a => a.lote === l.id);
     const count  = enLote.length;
-    // Los tres estados SIEMPRE suman el total (ningún animal se "pierde"):
-    // fuera = cruzó la cerca, aviso = cerca del borde, dentro = todo lo demás.
-    const fuera  = enLote.filter(a => a.estado === 'shock').length;
-    const aviso  = enLote.filter(a => a.estado === 'warn').length;
-    const dentro = count - fuera - aviso;
+    // C-1 (2026-07-24): las cuatro categorías suman el total sin mentir. Los sin
+    // señal se cuentan aparte; entre los EN LÍNEA: fuera=cruzó, aviso=borde, dentro=resto.
+    const enLinea  = enLote.filter(a => estaEnLinea(a));
+    const sinSenal = count - enLinea.length;
+    const fuera    = enLinea.filter(a => a.estado === 'shock').length;
+    const aviso    = enLinea.filter(a => a.estado === 'warn').length;
+    const dentro   = enLinea.length - fuera - aviso;
     const cercaLote = cercas.find(c => c.collares?.some(col => animales.find(a => a.collar===col && a.lote===l.id)));
     return `<div class="lote-card ${selectedLote===l.id?'selected':''}" onclick="selectLote(${l.id})">
       <div class="lote-head">
-        <div class="lote-color" style="background:${l.color}"></div>
-        <div class="lote-name">${l.nombre}</div>
+        <div class="lote-color" style="background:${safeColor(l.color)}"></div>
+        <div class="lote-name">${esc(l.nombre)}</div>
         <button onclick="event.stopPropagation(); abrirEditarLote(${l.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <div class="lote-count">${count}</div>
       </div>
@@ -1170,6 +1362,7 @@ function renderLotes() {
         <span style="color:#4ade80;">● ${dentro} dentro</span>
         <span style="color:#fbbf24;">● ${aviso} aviso</span>
         <span style="color:#f87171;">● ${fuera} fuera</span>
+        ${sinSenal ? `<span style="color:#6b7280;">○ ${sinSenal} sin señal</span>` : ''}
       </div>
       <div class="lote-meta" style="margin-top:4px;">
         <span>${cercaLote ? '◈ con cerca' : '○ sin cerca'}</span>
@@ -1234,11 +1427,20 @@ function guardarLote() {
 // Guardar (o actualizar) un lote en el servidor
 async function guardarLoteEnServidor(l) {
   try {
-    await authFetch(`${API_BASE}/lotes`, {
+    const res = await authFetch(`${API_BASE}/lotes`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: l.id, nombre: l.nombre, color: l.color })
     });
-  } catch(e) { console.error('No se pudo guardar el lote en el servidor', e); }
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      alert('No se pudo guardar el lote en el servidor. ' + (t || res.status));
+      return false;
+    }
+    return true;
+  } catch(e) {
+    alert('Sin conexión: el lote no se guardó en el servidor.');
+    return false;
+  }
 }
 
 // Borrar el lote que se está editando
@@ -1271,7 +1473,7 @@ function refreshCercaLoteSelect() {
     const sel = document.getElementById(selId);
     if (!sel) return;
     const val = sel.value;
-    sel.innerHTML = lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
+    sel.innerHTML = lotes.map(l => `<option value="${l.id}">${esc(l.nombre)}</option>`).join('');
     if (val) sel.value = val;
   });
 }
@@ -1290,12 +1492,12 @@ function renderAnimalesList() {
       : '<span style="color:#6b7280">○ sin señal</span>';
     return `<div class="lote-card" onclick="abrirPerfilAnimal(${a.id})">
       <div class="lote-head">
-        <div class="lote-color" style="background:${lote?lote.color:'#888'}"></div>
-        <div class="lote-name">${a.nombre}</div>
-        <div class="lote-count" style="background:${stColor}22; color:${stColor}">${a.collar}</div>
+        <div class="lote-color" style="background:${safeColor(lote?lote.color:'#888')}"></div>
+        <div class="lote-name">${esc(a.nombre)}</div>
+        <div class="lote-count" style="background:${stColor}22; color:${stColor}">${esc(a.collar)}</div>
       </div>
       <div class="lote-meta">
-        <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${a.bateria}%${a.carga === 1 ? ' ⚡' : ''}</span>
+        <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${esc(a.bateria)}%${a.carga === 1 ? ' ⚡' : ''}</span>
       </div>
     </div>`;
   }).join('');
@@ -1321,7 +1523,7 @@ function abrirPerfilAnimal(id) {
   const lote = lotes.find(l => l.id === a.lote);
   document.getElementById('modal-view').style.display = 'block';
   document.getElementById('modal-edit').style.display = 'none';
-  document.getElementById('modal-avatar').textContent = a.nombre[0];
+  document.getElementById('modal-avatar').textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '?';
   document.getElementById('modal-avatar').style.background = lote ? lote.color : '#888';
   document.getElementById('modal-name').textContent = a.nombre;
   document.getElementById('modal-collar').textContent = a.collar + ' · arete ' + a.arete;
@@ -1352,6 +1554,19 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-sats').textContent = a.sats != null ? a.sats : '—';
   document.getElementById('modal-rssi').textContent =
     a.rssi != null ? a.rssi + ' dBm' + (a.rssi > -70 ? ' (fuerte)' : a.rssi > -100 ? ' (media)' : ' (débil)') : '—';
+  // C parte 2 (2026-07-24): telemetría de campo. textContent = sink seguro (no HTML).
+  const hd = a.hdop != null ? Number(a.hdop) : null;
+  document.getElementById('modal-hdop').textContent =
+    (hd != null && isFinite(hd)) ? hd.toFixed(1) + (hd <= 1 ? ' (excelente)' : hd <= 2 ? ' (buena)' : hd <= 5 ? ' (regular)' : ' (mala)') : '—';
+  const sn = a.snr != null ? Number(a.snr) : null;
+  document.getElementById('modal-snr').textContent =
+    (sn != null && isFinite(sn)) ? sn + ' dB' + (sn >= 0 ? ' (buena)' : sn >= -10 ? ' (media)' : ' (débil)') : '—';
+  document.getElementById('modal-reinicios').textContent = a.reinicios != null ? a.reinicios : '—';
+  document.getElementById('modal-firmware').textContent = a.firmware || '—';
+
+  // C-2 (2026-07-24): el modal se repinta en cada refresco (ver refrescarModalSiAbierto).
+  document.getElementById('modal-frescura').innerHTML =
+    estaEnLinea(a) ? ' · <span style="color:#4ade80">● en vivo</span>' : ' · <span style="color:#6b7280">○ sin señal</span>';
 
   document.getElementById('modal-animal').classList.add('open');
 }
@@ -1441,7 +1656,7 @@ function guardarAnimal() {
 // Guardar (o actualizar) un animal en el servidor
 async function guardarAnimalEnServidor(a) {
   try {
-    await authFetch(`${API_BASE}/animales`, {
+    const res = await authFetch(`${API_BASE}/animales`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: a.id, nombre: a.nombre, collar: a.collar, arete: a.arete,
@@ -1449,7 +1664,30 @@ async function guardarAnimalEnServidor(a) {
         lote: a.lote, notas: a.notas
       })
     });
-  } catch(e) { console.error('No se pudo guardar el animal en el servidor', e); }
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      alert('No se pudo guardar el animal en el servidor. ' + (t || res.status));
+      return false;
+    }
+    // Reconciliar con lo que el servidor realmente guardó (el backend neutraliza a
+    // NULL un lote inexistente): reflejarlo en memoria y avisar si pasó.
+    const data = await res.json().catch(() => null);
+    if (data && data.animal) {
+      const local = animales.find(x => x.id === a.id);
+      const loteSrv = data.animal.lote != null ? Number(data.animal.lote) : null;
+      if (local && local.lote !== loteSrv) {
+        local.lote = loteSrv;
+        renderAnimales(); renderAnimalesList(); renderLotes();
+        if (a.lote && loteSrv == null) {
+          alert('El lote seleccionado no existe en el servidor; el animal quedó sin lote. Guarda el lote primero.');
+        }
+      }
+    }
+    return true;
+  } catch(e) {
+    alert('Sin conexión: el animal no se guardó en el servidor.');
+    return false;
+  }
 }
 
 function cancelarEdit() {
@@ -1460,13 +1698,52 @@ function cerrarModal() { document.getElementById('modal-animal').classList.remov
 
 // Dibujar el recorrido (rastro) del animal seleccionado
 let recorridoLayer = null;
+// C-2 (2026-07-24): si el perfil de un collar está abierto EN MODO VISTA, repintarlo con
+// los datos frescos de cada polling. No tocar si el modal está cerrado o en edición.
+function refrescarModalSiAbierto() {
+  if (editingAnimalId == null) return;
+  const overlay = document.getElementById('modal-animal');
+  const view = document.getElementById('modal-view');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  if (!view || view.style.display === 'none') return;   // en edición: no interrumpir
+  abrirPerfilAnimal(editingAnimalId);
+}
+
+// C-4 (2026-07-24): descargar el recorrido del collar como CSV para análisis. Encabezados
+// dinámicos según lo que devuelva el backend (se adapta si se agregan HDOP/SNR/etc.).
+async function descargarRecorridoCSV() {
+  const a = animales.find(x => x.id === editingAnimalId);
+  if (!a) return;
+  try {
+    const res = await authFetch(`${API_BASE}/historial?device=${encodeURIComponent(a.collar)}&limit=1000`);
+    if (!res.ok) { alert('No se pudo descargar el recorrido.'); return; }
+    const puntos = await res.json();
+    if (!Array.isArray(puntos) || !puntos.length) { alert('Sin datos de recorrido para ' + a.nombre + '.'); return; }
+    const cols = Object.keys(puntos[0]);
+    const celda = v => {
+      if (v == null) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const filas = [cols.join(',')];
+    puntos.forEach(p => filas.push(cols.map(c => celda(p[c])).join(',')));
+    const blob = new Blob([filas.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `recorrido_${a.collar}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Error al descargar: ' + e.message); }
+}
+
 async function verRecorrido() {
   const a = animales.find(x => x.id === editingAnimalId);
   if (!a) return;
   cerrarModal();
   if (recorridoLayer) { map.removeLayer(recorridoLayer); recorridoLayer = null; }
   try {
-    const res = await authFetch(`${API_BASE}/historial?device=${a.collar}&limit=100`);
+    const res = await authFetch(`${API_BASE}/historial?device=${encodeURIComponent(a.collar)}&limit=100`);
     if (!res.ok) { alert('No se pudo cargar el recorrido'); return; }
     const puntos = await res.json();
     if (puntos.length < 2) {
@@ -1475,14 +1752,14 @@ async function verRecorrido() {
     }
     const coords = puntos.reverse().map(p => [p.lat, p.lng]);
     const lote = lotes.find(l => l.id === a.lote);
-    const color = lote ? lote.color : '#4ade80';
+    const color = safeColor(lote ? lote.color : '#4ade80');
 
     recorridoLayer = L.layerGroup();
     L.polyline(coords, { color, weight: 3, opacity: 0.7 }).addTo(recorridoLayer);
     L.circleMarker(coords[0], { radius: 6, color:'#fff', fillColor:'#888', fillOpacity:1, weight:2 })
       .bindTooltip('Inicio').addTo(recorridoLayer);
     L.circleMarker(coords[coords.length-1], { radius: 8, color:'#fff', fillColor:color, fillOpacity:1, weight:3 })
-      .bindTooltip(a.nombre + ' (ahora)').addTo(recorridoLayer);
+      .bindTooltip(esc(a.nombre) + ' (ahora)').addTo(recorridoLayer);
     recorridoLayer.addTo(map);
     map.fitBounds(L.latLngBounds(coords).pad(0.2));
     mostrarAvisoRecorrido(a.nombre);
@@ -1499,7 +1776,7 @@ function mostrarAvisoRecorrido(nombre) {
     aviso.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--border); border-radius:24px; padding:10px 18px; z-index:2500; display:flex; align-items:center; gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.4); font-size:13px;';
     document.body.appendChild(aviso);
   }
-  aviso.innerHTML = `<span>📍 Recorrido de <strong>${nombre}</strong></span>
+  aviso.innerHTML = `<span>📍 Recorrido de <strong>${esc(nombre)}</strong></span>
     <button onclick="quitarRecorrido()" style="background:var(--danger); color:white; border:none; border-radius:16px; padding:5px 12px; font-size:12px; cursor:pointer;">Quitar</button>`;
   aviso.style.display = 'flex';
 }
@@ -1513,8 +1790,43 @@ function quitarRecorrido() {
 // ════════════════════════════════════════════════════════════
 //  TABS Y UTILIDADES
 // ════════════════════════════════════════════════════════════
+// D4/D5 (2026-07-24): cancelar cualquier modo de mapa activo (dibujo de cerca,
+// colocación de aguaje, edición de forma) y limpiar capas temporales. Evita los
+// "vértices/puntos fantasma" y las capas Leaflet huérfanas al cambiar de pestaña.
+function cancelarModosMapa() {
+  if (typeof drawingMode !== 'undefined' && drawingMode) {
+    drawingMode = false;
+    if (map) map.getContainer().style.cursor = '';
+    const bc = document.getElementById('btn-cerrar-poly'); if (bc) bc.style.display = 'none';
+    const bs = document.getElementById('btn-save-cerca');   if (bs) bs.style.display = 'none';
+  }
+  if (typeof tempMarkers !== 'undefined') {
+    tempMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+    tempMarkers = [];
+  }
+  if (typeof tempPolyline !== 'undefined' && tempPolyline) { try { map.removeLayer(tempPolyline); } catch(e){} tempPolyline = null; }
+  if (typeof currentPolyPts !== 'undefined') currentPolyPts = [];
+  if (typeof colocandoAguaje !== 'undefined' && colocandoAguaje) toggleColocarAguaje();
+  if (typeof colocandoInfra !== 'undefined' && colocandoInfra) toggleColocarInfra();
+  if (typeof editPolyLayer !== 'undefined' && editPolyLayer) { try { map.removeLayer(editPolyLayer); } catch(e){} editPolyLayer = null; }
+  if (typeof vertexMarkers !== 'undefined' && vertexMarkers.length) {
+    vertexMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+    vertexMarkers = [];
+  }
+  if (typeof moveHandle !== 'undefined' && moveHandle) { try { map.removeLayer(moveHandle); } catch(e){} moveHandle = null; }
+  if (typeof editandoForma !== 'undefined' && editandoForma) {
+    editandoForma = false;
+    const b = document.getElementById('ec-shape-btn');
+    if (b) { b.textContent = '✎ Editar forma (arrastrar puntos)'; b.classList.remove('btn-primary'); }
+  }
+}
+
 function showTab(t) {
-  ['lotes','nuevolote','cerca','cercas','editcerca','animales','agua'].forEach(p => {
+  // Cancelar modos activos y limpiar capas temporales al cambiar de pestaña. Es seguro
+  // en todos los casos: los flujos de dibujo/edición crean sus capas DESPUÉS de mostrar
+  // el panel, y guardarCercaActual lee currentPolyPts ANTES de llamar a showTab.
+  cancelarModosMapa();
+  ['lotes','nuevolote','cerca','cercas','editcerca','animales','agua','infra','arreo'].forEach(p => {
     const el = document.getElementById('pane-'+p);
     if (el) el.style.display = (p===t) ? 'block' : 'none';
   });
@@ -1523,7 +1835,9 @@ function showTab(t) {
     lotes: 0, nuevolote: 0,
     cercas: 1, cerca: 1, editcerca: 1,
     animales: 2,
-    agua: 3
+    agua: 3,
+    infra: 4,
+    arreo: 5
   };
   if (tabMap[t] !== undefined) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
@@ -1531,6 +1845,16 @@ function showTab(t) {
   if (t === 'cerca') refreshCercaLoteSelect();
   if (t === 'cercas') renderCercasList();
   if (t === 'agua') renderAguajes();
+  if (t === 'infra') cargarInstalaciones();
+  if (t === 'arreo') cargarArreo();
+}
+
+// Zonas (2026-07-24): la categoría es semántica; al elegirla se sugiere el TIPO de
+// enforcement por defecto (el ranchero puede cambiarlo después si sabe lo que hace).
+function aplicarCategoriaCerca() {
+  const cat = document.getElementById('cerca-categoria')?.value || 'potrero';
+  const sel = document.getElementById('cerca-tipo');
+  if (sel) { sel.value = catCerca(cat).tipoDefault; toggleHoras(); }
 }
 
 function toggleHoras() {
@@ -1551,11 +1875,14 @@ function toggleHoras() {
 function updateStats() {
   document.getElementById('stat-animales').textContent = animales.length;
   document.getElementById('stat-lotes').textContent = lotes.length;
-  // Consistente con las tarjetas: dentro = ni aviso ni fuera
+  // C-1 (2026-07-24): "dentro" cuenta SOLO collares en línea y sin alerta. Un collar
+  // que dejó de reportar NO debe contar como "dentro" (el tablero no debe mentir en campo).
   document.getElementById('stat-dentro').textContent =
-    animales.filter(a => a.estado !== 'warn' && a.estado !== 'shock').length;
+    animales.filter(a => estaEnLinea(a) && a.estado !== 'warn' && a.estado !== 'shock').length;
   document.getElementById('stat-alertas').textContent =
     animales.filter(a => a.estado === 'warn' || a.estado === 'shock').length;
+  document.getElementById('stat-sinsenal').textContent =
+    animales.filter(a => !estaEnLinea(a)).length;
 }
 
 // Color picker para lotes
@@ -1585,6 +1912,10 @@ async function cargarPerfilesIniciales() {
       const data = await res.json();
       if (data.length) {
         lotes = data.map(l => ({ id: Number(l.id), nombre: l.nombre, color: l.color }));
+      } else {
+        // Cuenta nueva (servidor sin lotes): persistir el/los lote(s) semilla para que
+        // existan y los animales puedan referenciarlos (evita que se guarden con lote NULL).
+        for (const l of lotes) await guardarLoteEnServidor(l);
       }
     }
   } catch(e) { /* sin conexión, usa los de memoria */ }
@@ -1610,9 +1941,51 @@ async function cargarPerfilesIniciales() {
   renderLotes(); renderAnimales(); renderAnimalesList();
 }
 
+// Indicador de conexión: muestra un banner cuando el polling falla (datos viejos).
+// ── PWA (2026-07-24): offline resiliente para el rancho ──────────────────────
+// El service worker cachea el shell, Leaflet, los tiles ya vistos y los últimos GET
+// de la API. Solo se activa sobre HTTPS/localhost (en file:// no aplica y se omite).
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { scope: './' })
+      .then(r => console.log('SW Lindero registrado', r.scope))
+      .catch(e => console.warn('SW no registrado:', e.message));
+  });
+}
+// Al volver la señal: refrescar de inmediato (no esperar el próximo polling).
+window.addEventListener('online', () => { mostrarBannerConexion(true); if (authToken) actualizarDesdeServidor(); });
+window.addEventListener('offline', () => mostrarBannerConexion(false));
+
+function mostrarBannerConexion(ok) {
+  let b = document.getElementById('banner-conexion');
+  if (ok) { if (b) b.style.display = 'none'; return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'banner-conexion';
+    b.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#7f1d1d; color:#fecaca; text-align:center; padding:6px 10px; font-size:12px; z-index:3000;';
+    document.body.appendChild(b);
+  }
+  const t = window._ultimoRefrescoOk;
+  const min = t ? Math.floor((Date.now() - t) / 60000) : null;
+  b.textContent = '⚠ Sin conexión con el servidor' +
+    (min != null ? ` — datos de hace ${min} min` : ' — mostrando datos guardados');
+  b.style.display = 'block';
+}
+
 async function actualizarDesdeServidor() {
   // La primera vez, cargar perfiles guardados (lotes y animales)
   if (!perfilesYaCargados) await cargarPerfilesIniciales();
+
+  // v6: estado del modo arreo — refrescar si está activo, si el panel está
+  // abierto, o en la primera pasada (para pintar el chip al entrar).
+  try {
+    const paneArreo = document.getElementById('pane-arreo');
+    if (arreoEstado.activo || !window._arreoInicializado ||
+        (paneArreo && paneArreo.style.display === 'block')) {
+      window._arreoInicializado = true;
+      await cargarArreo();
+    }
+  } catch(e) {}
 
   // 1. Posiciones de los collares (datos en vivo sobre los perfiles)
   try {
@@ -1630,11 +2003,19 @@ async function actualizarDesdeServidor() {
           if (c.rssi != null)       a.rssi = c.rssi;
           if (c.bateria != null)    a.bateria = c.bateria;
           if (c.carga != null)      a.carga = c.carga;
+          // C parte 2 (2026-07-24): telemetría de campo
+          if (c.hdop != null)       a.hdop = c.hdop;
+          if (c.snr != null)        a.snr = c.snr;
+          if (c.firmware)           a.firmware = c.firmware;
+          if (c.reinicios_anormales != null) a.reinicios = c.reinicios_anormales;
         }
       });
       renderAnimales(); renderLotes();
-    }
-  } catch(e) { /* sin conexión */ }
+      refrescarModalSiAbierto();   // C-2: repintar el perfil abierto con datos en vivo
+      window._ultimoRefrescoOk = Date.now();
+      mostrarBannerConexion(true);
+    } else { mostrarBannerConexion(false); }
+  } catch(e) { mostrarBannerConexion(false); }
 
   // 2. Cercas guardadas en el servidor
   try {
@@ -1645,6 +2026,7 @@ async function actualizarDesdeServidor() {
         id: g.id,
         nombre: g.nombre,
         tipo: g.tipo,
+        categoria: g.categoria || 'potrero',
         color: g.color || '#4ade80',
         warn_dist_m: g.warn_dist_m,
         activa: g.activa !== false,
@@ -1655,11 +2037,17 @@ async function actualizarDesdeServidor() {
       }));
       renderCercas();
       renderCercasList();
+      // Primer encuadre: abrir en TUS cercas/collares, no en el punto por defecto (una sola vez).
+      if (!window._mapaEncuadrado && encuadrarTodo()) window._mapaEncuadrado = true;
     }
   } catch(e) { /* sin conexión */ }
 
   // 2b. Aguajes (puntos de agua)
   cargarAguajes();
+
+  // 2c. Infraestructura — una sola vez (es estático; se recarga al abrir su pestaña
+  // o tras un cambio). Evita redibujar cada 5 s e interrumpir un arrastre.
+  if (!window._infraInicializado) { window._infraInicializado = true; cargarInstalaciones(); }
 
   // 3. Alertas (cruces y avisos)
   try {
@@ -1690,8 +2078,12 @@ function renderAlertas() {
     const animal = animales.find(x => x.collar === a.device);
     const nombre = animal ? animal.nombre : a.device;
     const esCruce = a.tipo === 'shock';
-    const icono = esCruce ? '🔴' : '🟡';
-    const color = esCruce ? 'var(--danger)' : '#fbbf24';
+    const esBloqueo = a.tipo === 'bloqueo';   // v6: límite de estímulos alcanzado
+    const icono = esBloqueo ? '⛔' : (esCruce ? '🔴' : '🟡');
+    const color = (esBloqueo || esCruce) ? 'var(--danger)' : '#fbbf24';
+    const textoAlerta = esBloqueo
+      ? 'alcanzó el límite de estímulos — <strong>requiere atención presencial</strong>'
+      : (esCruce ? 'cruzó la cerca' : 'se acercó al límite');
 
     // Episodio: inicio (ts), última vez visto (ts_fin), duración
     const inicio = new Date(a.ts).getTime();
@@ -1712,11 +2104,11 @@ function renderAlertas() {
         <span>${icono}</span>
         <div style="flex:1;">
           <div style="font-size:13px; color:var(--text); line-height:1.4;">
-            <strong>${nombre}</strong> ${esCruce ? 'cruzó la cerca' : 'se acercó al límite'}
+            <strong>${esc(nombre)}</strong> ${textoAlerta}
           </div>
           <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">${lineaTiempo}</div>
         </div>
-        <button onclick="irAAlerta(${a.lat},${a.lng})" style="font-size:10px; padding:4px 8px; border-radius:5px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Ver</button>
+        <button onclick="irAAlerta(${Number(a.lat)},${Number(a.lng)})" style="font-size:10px; padding:4px 8px; border-radius:5px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Ver</button>
       </div>
     </div>`;
   }).join('');
@@ -1742,6 +2134,110 @@ async function marcarAlertasLeidas() {
     a.leida = true;
   }
   renderAlertas();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  MODO ARREO (v6) — mover ganado entre potreros sin estímulo
+// ─────────────────────────────────────────────────────────────
+let arreoEstado = { activo: false };
+
+async function cargarArreo() {
+  try {
+    const res = await authFetch(`${API_BASE}/arreo`);
+    if (res.ok) { arreoEstado = await res.json(); }
+  } catch(e) { /* sin conexión */ }
+  renderArreo();
+  // Llenar el selector de destino con las cercas activas de contención
+  try {
+    const sel = document.getElementById('arreo-destino');
+    if (sel) {
+      const rc = await authFetch(`${API_BASE}/geovallas`);
+      if (rc.ok) {
+        const cs = await rc.json();
+        const val = sel.value;
+        sel.innerHTML = '<option value="">Sin destino — solo por tiempo</option>' +
+          cs.filter(c => c.activa !== false && c.tipo !== 'exclusion' && c.tipo !== 'simbolica')
+            .map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+        sel.value = val;
+      }
+    }
+  } catch(e) {}
+}
+
+function renderArreo() {
+  // Chip del header: visible mientras haya un arreo activo
+  const chip = document.getElementById('arreo-chip');
+  if (chip) chip.style.display = arreoEstado.activo ? 'inline-block' : 'none';
+
+  const card = document.getElementById('arreo-activo-card');
+  const form = document.getElementById('arreo-form');
+  if (!card || !form) return;
+
+  if (!arreoEstado.activo) {
+    card.style.display = 'none';
+    form.style.display = 'block';
+    return;
+  }
+  form.style.display = 'none';
+  card.style.display = 'block';
+
+  let progresoHtml = '';
+  if (arreoEstado.destino && arreoEstado.progreso && arreoEstado.progreso.length) {
+    const dentro = arreoEstado.progreso.filter(p => p.dentro).length;
+    progresoHtml = `
+      <div style="font-size:12px; color:var(--text-dim); margin:10px 0 6px;">
+        Progreso hacia <strong style="color:var(--text)">${esc(arreoEstado.destino.nombre)}</strong>:
+        ${dentro} de ${arreoEstado.progreso.length} adentro
+      </div>` +
+      arreoEstado.progreso.map(p => {
+        const animal = (typeof animales !== 'undefined' && animales.find(x => x.collar === p.device));
+        const nombre = animal ? animal.nombre : p.device;
+        const estadoIcono = p.dentro ? '✅ adentro' : (p.confirmado ? '🚶 en camino (arreo confirmado)' : '⏳ sin confirmar aún');
+        return `<div style="font-size:12px; padding:4px 0; border-bottom:0.5px solid var(--border);">
+          <strong>${esc(nombre)}</strong> — ${estadoIcono}
+        </div>`;
+      }).join('');
+  } else if (arreoEstado.progreso === undefined || !arreoEstado.destino) {
+    progresoHtml = `<div style="font-size:12px; color:var(--text-dim); margin-top:10px;">
+      Sin destino: el arreo termina solo al agotarse el tiempo, o manualmente.
+    </div>`;
+  }
+
+  card.innerHTML = `
+    <div style="background:#3b2f0e; border:1px solid #a16207; border-radius:10px; padding:14px;">
+      <div style="font-size:14px; font-weight:700; color:#fbbf24;">🐄 Arreo en curso</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-top:4px;">
+        Quedan ~<strong style="color:var(--text)">${esc(arreoEstado.restante_min)} min</strong>
+        de ${esc(arreoEstado.duracion_min)} min. Los collares no aplican estímulo ni buzzer.
+      </div>
+      ${progresoHtml}
+      <button class="btn" onclick="terminarArreo()" style="margin-top:12px; border-color:var(--danger); color:var(--danger);">
+        Terminar arreo ahora
+      </button>
+    </div>`;
+}
+
+async function iniciarArreo() {
+  const dur = parseInt(document.getElementById('arreo-duracion').value);
+  const destino = document.getElementById('arreo-destino').value;
+  if (!confirm(`¿Iniciar modo arreo por ${dur >= 60 ? (dur/60) + ' hora(s)' : dur + ' minutos'}?\n\nLos collares dejarán de aplicar estímulo y buzzer.`)) return;
+  try {
+    const res = await authFetch(`${API_BASE}/arreo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duracion_min: dur, destino_valla_id: destino ? parseInt(destino) : null })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'No se pudo iniciar el arreo'); return; }
+    await cargarArreo();
+  } catch(e) { alert('Sin conexión. Intenta de nuevo.'); }
+}
+
+async function terminarArreo() {
+  if (!confirm('¿Terminar el arreo? La contención se reactiva en los collares en ~1 minuto.\n\nSi hay animales todavía en el camino entre potreros, el sistema los empujará hacia el potrero más cercano.')) return;
+  try {
+    await authFetch(`${API_BASE}/arreo/terminar`, { method: 'POST' });
+    await cargarArreo();
+  } catch(e) { alert('Sin conexión. Intenta de nuevo.'); }
 }
 
 // Borrar una cerca (en el servidor y en el mapa)
@@ -1819,7 +2315,7 @@ async function cargarReporte() {
       html += `<p style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin:14px 0 8px;">💧 Visitas a aguajes</p>`;
       r.aguajes.forEach(a => {
         html += `<div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
-          <span>${a.nombre}</span><strong>${a.visitas} ${a.visitas===1?'visita':'visitas'}</strong></div>`;
+          <span>${esc(a.nombre)}</span><strong>${esc(a.visitas)} ${a.visitas===1?'visita':'visitas'}</strong></div>`;
       });
     }
 
@@ -1831,7 +2327,7 @@ async function cargarReporte() {
         const nombre = animal ? animal.nombre : c.device;
         const est = c.estado === 'shock' ? '🔴 fuera' : c.estado === 'warn' ? '🟡 aviso' : '🟢 dentro';
         html += `<div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--panel); border-radius:8px; margin-bottom:6px;">
-          <span>${nombre}</span><span>${est}</span></div>`;
+          <span>${esc(nombre)}</span><span>${est}</span></div>`;
       });
     }
 
@@ -1869,9 +2365,28 @@ function dibujarAguajes() {
   Object.values(aguajeLayers).forEach(l => map.removeLayer(l));
   aguajeLayers = {};
   aguajes.forEach(a => {
-    const m = L.marker([a.lat, a.lng], { icon: iconoAguaje() }).addTo(map);
-    m.bindPopup(`<b>💧 ${a.nombre}</b><br>radio ${a.radio_m||20}m`);
-    aguajeLayers[a.id] = m;
+    const radio = Number(a.radio_m) || 20;
+    const g = L.layerGroup();
+    const circulo = L.circle([a.lat, a.lng], {
+      radius: radio, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.12, weight: 1
+    }).addTo(g);
+    const m = L.marker([a.lat, a.lng], { icon: iconoAguaje(), draggable: true }).addTo(g);
+    m.bindPopup(`<b>💧 ${esc(a.nombre)}</b><br>radio ${esc(radio)} m`);
+    // Reubicar arrastrando: el círculo sigue al marcador y se persiste al soltar (PATCH).
+    m.on('drag', () => circulo.setLatLng(m.getLatLng()));
+    m.on('dragend', async () => {
+      const ll = m.getLatLng();
+      try {
+        const res = await authFetch(`${API_BASE}/aguajes/${a.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: ll.lat, lng: ll.lng })
+        });
+        if (res.ok) { a.lat = ll.lat; a.lng = ll.lng; }
+        else { alert('No se pudo mover el aguaje.'); dibujarAguajes(); }
+      } catch(e) { alert('Error de conexión.'); dibujarAguajes(); }
+    });
+    g.addTo(map);
+    aguajeLayers[a.id] = g;
   });
 }
 
@@ -1883,14 +2398,34 @@ function renderAguajes() {
     return;
   }
   cont.innerHTML = aguajes.map(a => `
-    <div class="lote-card" onclick="irACerca([{&quot;lat&quot;:${a.lat},&quot;lng&quot;:${a.lng}}])">
+    <div class="lote-card" onclick="irACerca([{&quot;lat&quot;:${Number(a.lat)},&quot;lng&quot;:${Number(a.lng)}}])">
       <div class="lote-head">
         <div style="font-size:18px;">💧</div>
-        <div class="lote-name">${a.nombre}</div>
+        <div class="lote-name">${esc(a.nombre)}</div>
+        <button onclick="event.stopPropagation(); editarAguaje(${a.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <button onclick="event.stopPropagation(); borrarAguaje(${a.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Quitar</button>
       </div>
-      <div class="lote-meta"><span>radio ${a.radio_m||20} m</span></div>
+      <div class="lote-meta"><span>radio ${esc(a.radio_m||20)} m</span></div>
     </div>`).join('');
+}
+
+async function editarAguaje(id) {
+  const a = aguajes.find(x => x.id === id);
+  if (!a) return;
+  const nombre = prompt('Nombre del aguaje:', a.nombre);
+  if (nombre === null) return;
+  let radio = prompt('Radio en metros:', a.radio_m || 20);
+  if (radio === null) return;
+  radio = parseInt(radio, 10);
+  if (!Number.isFinite(radio) || radio < 1) radio = a.radio_m || 20;
+  try {
+    const res = await authFetch(`${API_BASE}/aguajes/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: nombre || a.nombre, radio_m: radio })
+    });
+    if (res.ok) { const d = await res.json(); Object.assign(a, d.aguaje); dibujarAguajes(); renderAguajes(); }
+    else alert('No se pudo actualizar el aguaje.');
+  } catch(e) { alert('Error de conexión.'); }
 }
 
 function toggleColocarAguaje() {
@@ -1898,23 +2433,26 @@ function toggleColocarAguaje() {
   const btn = document.getElementById('btn-agua-toggle');
   const hint = document.getElementById('agua-hint');
   if (colocandoAguaje) {
-    btn.textContent = '✕ Cancelar';
+    btn.textContent = '✓ Listo';
     hint.style.display = 'block';
     if (map) map.getContainer().style.cursor = 'crosshair';
   } else {
-    btn.textContent = '💧 Marcar aguaje en el mapa';
+    btn.textContent = '💧 Marcar aguajes en el mapa';
     hint.style.display = 'none';
     if (map) map.getContainer().style.cursor = '';
   }
 }
 
 async function crearAguajeEn(lat, lng) {
-  const nombre = prompt('Nombre del aguaje (ej: Pozo norte, Tanque grande):', 'Aguaje');
-  if (nombre === null) { toggleColocarAguaje(); return; }
+  // Toma nombre y radio del panel (sin prompt). Colocación CONTINUA: el modo NO se
+  // apaga tras crear uno — el usuario marca varios y pulsa "✓ Listo" al terminar.
+  const nombre = (document.getElementById('agua-nombre')?.value || '').trim() || 'Aguaje';
+  let radio = parseInt(document.getElementById('agua-radio')?.value, 10);
+  if (!Number.isFinite(radio) || radio < 1) radio = 30;
   try {
     const res = await authFetch(`${API_BASE}/aguajes`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nombre || 'Aguaje', lat, lng, radio_m: 20 })
+      body: JSON.stringify({ nombre, lat, lng, radio_m: radio })
     });
     if (res.ok) {
       const data = await res.json();
@@ -1925,7 +2463,6 @@ async function crearAguajeEn(lat, lng) {
       alert('No se pudo guardar el aguaje.');
     }
   } catch(e) { alert('Error de conexión.'); }
-  toggleColocarAguaje();
 }
 
 async function borrarAguaje(id) {
@@ -1936,6 +2473,169 @@ async function borrarAguaje(id) {
       aguajes = aguajes.filter(a => a.id !== id);
       dibujarAguajes();
       renderAguajes();
+    }
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+// ── Infraestructura del rancho (2026-07-24) ──────────────────────────────────
+function poblarSelectInfra() {
+  const sel = document.getElementById('infra-tipo');
+  if (!sel || sel.options.length) return;
+  Object.keys(TIPOS_INFRA).forEach(k => {
+    const o = document.createElement('option');
+    o.value = k;                                   // valor = clave segura (allowlist backend)
+    o.textContent = TIPOS_INFRA[k].icono + '  ' + TIPOS_INFRA[k].label;
+    sel.appendChild(o);
+  });
+}
+
+async function cargarInstalaciones() {
+  try {
+    const res = await authFetch(`${API_BASE}/instalaciones`);
+    if (res.ok) {
+      instalaciones = await res.json();
+      dibujarInstalaciones();
+      renderInstalaciones();
+    }
+  } catch(e) {}
+}
+
+function dibujarInstalaciones() {
+  Object.values(instalacionLayers).forEach(l => map.removeLayer(l));
+  instalacionLayers = {};
+  instalaciones.forEach(it => {
+    if (infraOculto.has(it.tipo)) return;
+    if (it.lat == null || it.lng == null) return;
+    const g = L.layerGroup();
+    // Antenas/gateways/torres: círculo de cobertura estimada si está definido.
+    let circuloCob = null;
+    if (it.cobertura_m && ['antena','gateway','torre','starlink'].includes(it.tipo)) {
+      circuloCob = L.circle([Number(it.lat), Number(it.lng)], {
+        radius: Number(it.cobertura_m) || 0, color: '#a78bfa', fillColor: '#a78bfa',
+        fillOpacity: 0.07, weight: 1, dashArray: '4 4'
+      }).addTo(g);
+    }
+    const icon = L.divIcon({
+      className: 'infra-icon',
+      html: `<div style="font-size:20px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));">${infraIcono(it.tipo)}</div>`,
+      iconSize: [22, 22], iconAnchor: [11, 11]
+    });
+    const m = L.marker([Number(it.lat), Number(it.lng)], { icon, draggable: true }).addTo(g);
+    const desc = it.descripcion ? '<br>' + esc(it.descripcion) : '';
+    m.bindPopup(`<b>${infraIcono(it.tipo)} ${esc(it.nombre)}</b><br><span style="color:#888">${esc(infraLabel(it.tipo))}</span>${desc}`);
+    m.on('drag', () => { if (circuloCob) circuloCob.setLatLng(m.getLatLng()); });   // el círculo de cobertura sigue al ícono
+    m.on('dragend', async () => {
+      const ll = m.getLatLng();
+      try {
+        const res = await authFetch(`${API_BASE}/instalaciones/${it.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: ll.lat, lng: ll.lng })
+        });
+        if (res.ok) { it.lat = ll.lat; it.lng = ll.lng; }
+        else { alert('No se pudo mover la instalación.'); dibujarInstalaciones(); }
+      } catch(e) { alert('Error de conexión.'); dibujarInstalaciones(); }
+    });
+    g.addTo(map);
+    instalacionLayers[it.id] = g;
+  });
+}
+
+function renderInstalaciones() {
+  poblarSelectInfra();
+  // Filtro: un chip por tipo presente. onclick con esc(JSON.stringify()) (patrón anti-XSS).
+  const filtro = document.getElementById('infra-filtro');
+  if (filtro) {
+    const tipos = [...new Set(instalaciones.map(i => i.tipo))];
+    filtro.innerHTML = tipos.map(t => {
+      const oculto = infraOculto.has(t);
+      return `<button onclick="toggleFiltroInfra(${esc(JSON.stringify(t))})" style="font-size:11px; padding:3px 8px; border-radius:999px; cursor:pointer; border:1px solid var(--border); background:${oculto ? 'transparent' : 'var(--accent-wash,#1b2733)'}; color:${oculto ? 'var(--text-dim)' : 'var(--text)'}; opacity:${oculto ? 0.5 : 1};">${infraIcono(t)} ${esc(infraLabel(t))}</button>`;
+    }).join('');
+  }
+  const cont = document.getElementById('infra-list');
+  if (!cont) return;
+  if (!instalaciones.length) {
+    cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:12px 0;">Aún no hay infraestructura marcada.</p>';
+    return;
+  }
+  cont.innerHTML = instalaciones.map(it => {
+    const tienePunto = it.lat != null && it.lng != null;
+    const irOnclick = tienePunto ? ` onclick="irACerca([{&quot;lat&quot;:${Number(it.lat)},&quot;lng&quot;:${Number(it.lng)}}])"` : '';
+    return `
+    <div class="lote-card"${irOnclick}>
+      <div class="lote-head">
+        <div style="font-size:18px;">${infraIcono(it.tipo)}</div>
+        <div class="lote-name">${esc(it.nombre)}</div>
+        <button onclick="event.stopPropagation(); editarInstalacion(${Number(it.id)})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
+        <button onclick="event.stopPropagation(); borrarInstalacion(${Number(it.id)})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Quitar</button>
+      </div>
+      <div class="lote-meta"><span>${esc(infraLabel(it.tipo))}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleFiltroInfra(t) {
+  if (infraOculto.has(t)) infraOculto.delete(t); else infraOculto.add(t);
+  dibujarInstalaciones();
+  renderInstalaciones();
+}
+
+function toggleColocarInfra() {
+  colocandoInfra = !colocandoInfra;
+  const btn = document.getElementById('btn-infra-toggle');
+  const hint = document.getElementById('infra-hint');
+  if (colocandoInfra) {
+    btn.textContent = '✓ Listo';
+    hint.style.display = 'block';
+    if (map) map.getContainer().style.cursor = 'crosshair';
+  } else {
+    btn.textContent = '📍 Marcar en el mapa';
+    hint.style.display = 'none';
+    if (map) map.getContainer().style.cursor = '';
+  }
+}
+
+async function crearInstalacionEn(lat, lng) {
+  const tipo = document.getElementById('infra-tipo')?.value || 'referencia';
+  const nombre = (document.getElementById('infra-nombre')?.value || '').trim() || infraLabel(tipo);
+  try {
+    const res = await authFetch(`${API_BASE}/instalaciones`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo, nombre, lat, lng })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      instalaciones.unshift(data.instalacion);
+      infraOculto.delete(tipo);   // el tipo recién creado siempre visible
+      const inp = document.getElementById('infra-nombre'); if (inp) inp.value = '';  // evita nombres duplicados en colocación continua
+      dibujarInstalaciones();
+      renderInstalaciones();
+    } else { alert('No se pudo guardar la instalación.'); }
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function editarInstalacion(id) {
+  const it = instalaciones.find(x => x.id === id);
+  if (!it) return;
+  const nombre = prompt('Nombre de la instalación:', it.nombre);
+  if (nombre === null) return;
+  try {
+    const res = await authFetch(`${API_BASE}/instalaciones/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: nombre || it.nombre })
+    });
+    if (res.ok) { const d = await res.json(); Object.assign(it, d.instalacion); dibujarInstalaciones(); renderInstalaciones(); }
+    else alert('No se pudo actualizar la instalación.');
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function borrarInstalacion(id) {
+  if (!confirm('¿Quitar esta instalación?')) return;
+  try {
+    const res = await authFetch(`${API_BASE}/instalaciones/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      instalaciones = instalaciones.filter(x => x.id !== id);
+      dibujarInstalaciones();
+      renderInstalaciones();
     }
   } catch(e) { alert('Error de conexión.'); }
 }
@@ -1956,15 +2656,15 @@ function renderCercasList() {
       timer = ms > 0 ? ` · expira en ${Math.floor(ms/3600000)}h` : ' · expirada';
     }
     const activa = c.activa !== false;
-    return `<div class="lote-card" style="${activa?'':'opacity:.5'}" onclick="irACerca(${JSON.stringify(c.poligono).replace(/"/g,'&quot;')})">
+    return `<div class="lote-card" style="${activa?'':'opacity:.5'}" onclick="irACerca(${esc(JSON.stringify(c.poligono))})">
       <div class="lote-head">
-        <div class="lote-color" style="background:${c.color}"></div>
-        <div class="lote-name">${c.nombre}</div>
+        <div class="lote-color" style="background:${safeColor(c.color)}"></div>
+        <div class="lote-name">${catCerca(c.categoria).icono} ${esc(c.nombre)}</div>
         <button onclick="event.stopPropagation(); abrirEditarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <button onclick="event.stopPropagation(); borrarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Borrar</button>
       </div>
       <div class="lote-meta" style="margin-top:8px; align-items:center;">
-        <span>${tipoLabel}</span><span>${c.poligono.length} vértices${timer}</span>
+        <span>${esc(catCerca(c.categoria).label)} · ${tipoLabel}</span><span>${c.poligono.length} vértices${timer}</span>
         <label style="margin-left:auto; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="event.stopPropagation();">
           <span style="color:${activa?'#4ade80':'var(--text-dim)'}; font-weight:500;">${activa?'Activa':'Inactiva'}</span>
           <span onclick="toggleCercaActiva(${c.id})" style="position:relative; width:38px; height:21px; border-radius:11px; background:${activa?'#4ade80':'#4b5563'}; display:inline-block; transition:background .2s;">
@@ -1998,6 +2698,8 @@ function abrirEditarCerca(id) {
   // Llenar el formulario
   document.getElementById('ec-nombre').value = c.nombre;
   document.getElementById('ec-tipo').value = c.tipo || 'permanente';
+  const selCat = document.getElementById('ec-categoria'); if (selCat) selCat.value = c.categoria || 'potrero';
+  const inW = document.getElementById('ec-warn'); if (inW) inW.value = c.warn_dist_m || 10;
 
   // Paleta de colores (marcar el actual)
   const cont = document.getElementById('ec-colors');
@@ -2021,6 +2723,8 @@ function abrirEditarCerca(id) {
 
 // Activar/desactivar el arrastre de vértices con marcadores arrastrables
 let vertexMarkers = [];   // marcadores en cada esquina
+let moveHandle = null;    // 🆕 manija central que traslada la cerca COMPLETA
+let moveHandlePrev = null;
 
 function toggleEditarForma() {
   const c = cercas.find(x => x.id === editingCercaId);
@@ -2064,6 +2768,30 @@ function toggleEditarForma() {
     // Tocar el borde del polígono agrega un vértice nuevo ahí
     editPolyLayer.on('click', (e) => {
       agregarVerticeEn(e.latlng, c.color);
+    });
+
+    // 🆕 Mover la cerca COMPLETA: manija ✥ en el centro; arrastrarla traslada
+    // todos los vértices por el mismo delta (y el polígono en vivo).
+    const ctr = editPolyLayer.getBounds().getCenter();
+    moveHandle = L.marker(ctr, {
+      draggable: true,
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid ' + safeColor(c.color) + ';display:flex;align-items:center;justify-content:center;font-size:17px;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:move;">✥</div>',
+        iconSize: [30, 30], iconAnchor: [15, 15]
+      })
+    }).addTo(map);
+    moveHandle.bindTooltip('Mover cerca completa', { direction: 'top', offset: [0, -14] });
+    moveHandlePrev = ctr;
+    moveHandle.on('drag', () => {
+      const now = moveHandle.getLatLng();
+      const dLat = now.lat - moveHandlePrev.lat, dLng = now.lng - moveHandlePrev.lng;
+      vertexMarkers.forEach(mk => {
+        const p = mk.getLatLng();
+        mk.setLatLng([p.lat + dLat, p.lng + dLng]);
+      });
+      editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
+      moveHandlePrev = now;
     });
 
     editandoForma = true;
@@ -2117,6 +2845,7 @@ function capturarForma(c) {
   }
   vertexMarkers.forEach(m => map.removeLayer(m));
   vertexMarkers = [];
+  if (moveHandle) { map.removeLayer(moveHandle); moveHandle = null; }
   if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
   editandoForma = false;
 }
@@ -2131,7 +2860,10 @@ async function guardarEdicionCerca() {
   // Tomar los valores del formulario
   c.nombre = document.getElementById('ec-nombre').value.trim() || c.nombre;
   c.tipo = document.getElementById('ec-tipo').value;
-  c.warn_dist_m = 10;
+  c.categoria = document.getElementById('ec-categoria')?.value || c.categoria || 'potrero';
+  let warnDist = parseInt(document.getElementById('ec-warn')?.value, 10);
+  if (!Number.isFinite(warnDist) || warnDist < 2 || warnDist > 200) warnDist = c.warn_dist_m || 10;
+  c.warn_dist_m = warnDist;
   c.color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
 
   // Guardar en el servidor
@@ -2139,7 +2871,7 @@ async function guardarEdicionCerca() {
     const res = await authFetch(`${API_BASE}/geovallas/${c.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nombre: c.nombre, poligono: c.poligono,
+        nombre: c.nombre, poligono: c.poligono, categoria: c.categoria,
         warn_dist_m: c.warn_dist_m, color: c.color
       })
     });
@@ -2156,10 +2888,47 @@ async function guardarEdicionCerca() {
   }
 }
 
+// 🆕 Duplicar la cerca completa (2026-07-24): crea una copia desplazada al sur del
+// original, con la misma categoría/tipo/color/aviso y la MISMA asignación de collares
+// que la original (semántica idéntica; luego se mueve/edita). Temporal → copia de 6 h.
+async function duplicarCerca() {
+  const c = cercas.find(x => x.id === editingCercaId);
+  if (!c) return;
+  if (editandoForma) capturarForma(c);   // no duplicar una forma a medio editar
+  const lats = c.poligono.map(p => p.lat);
+  const alto = (Math.max(...lats) - Math.min(...lats)) || 0.001;
+  const poligono = c.poligono.map(p => ({ lat: p.lat - alto * 1.15, lng: p.lng }));
+  const payload = {
+    nombre: (c.nombre || 'Cerca') + ' (copia)',
+    tipo: c.tipo || 'permanente',
+    categoria: c.categoria || 'potrero',
+    poligono,
+    warn_dist_m: c.warn_dist_m || 10,
+    color: c.color,
+    collares: c.collares || [],
+    ...(c.tipo === 'temporal' ? { horas: 6 } : {})
+  };
+  try {
+    const res = await authFetch(`${API_BASE}/geovallas`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      alert('⧉ Copia creada: "' + payload.nombre + '". Muévela con ✥ desde Editar.');
+      actualizarDesdeServidor();
+      showTab('cercas');
+    } else {
+      const err = await res.text();
+      alert('⚠ No se pudo duplicar: ' + err);
+    }
+  } catch(e) { alert('⚠ Error de conexión al duplicar.'); }
+}
+
 function cancelarEdicionCerca() {
   if (editandoForma) {
     vertexMarkers.forEach(m => map.removeLayer(m));
     vertexMarkers = [];
+    if (moveHandle) { map.removeLayer(moveHandle); moveHandle = null; }
     if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
     editandoForma = false;
   }

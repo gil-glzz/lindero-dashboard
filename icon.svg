@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Maskable: fondo a sangre (safe-zone central para el recorte del sistema) -->
+  <rect width="512" height="512" fill="#4ade80"/>
+  <rect x="150" y="120" width="24" height="272" rx="10" fill="#06130b"/>
+  <rect x="150" y="368" width="212" height="24" rx="10" fill="#06130b"/>
+  <circle cx="362" cy="150" r="30" fill="none" stroke="#06130b" stroke-width="16"/>
+  <circle cx="362" cy="150" r="7" fill="#06130b"/>
+</svg>
