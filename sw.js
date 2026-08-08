@@ -14,7 +14,10 @@
 // empiece con el VER actual, así que subirlo es lo único que hace falta.
 //   v2 (2026-08-06): arreglos de fallas silenciosas — ids semilla, gris ambiguo,
 //                    aviso de collar huérfano y "buscando…" al arrancar.
-const VER = 'lindero-v2';
+//   v3 (2026-08-06): el mapa se rompía al volver de pruebas.html con Atrás
+//                    (bfcache: no se dispara `load`, Leaflet queda con el
+//                    tamaño viejo y los mosaicos salen regados).
+const VER = 'lindero-v3';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;

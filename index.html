@@ -1051,6 +1051,22 @@ setTimeout(fixMapSize, 500);
 setTimeout(fixMapSize, 1200);
 window.addEventListener('load', fixMapSize);
 window.addEventListener('resize', fixMapSize);
+// ⛔ CORREGIDO 2026-08-06: al volver de pruebas.html con el botón Atrás, el
+// navegador restaura la página desde su caché de ida y vuelta (bfcache) y NO
+// vuelve a disparar `load`. Leaflet se queda con el tamaño de antes y los
+// mosaicos salen regados sobre fondo negro, como si el mapa se hubiera roto.
+// `pageshow` sí se dispara en ese caso, y `visibilitychange` cubre el volver de
+// otra pestaña o de la app en segundo plano en el teléfono.
+window.addEventListener('pageshow', e => {
+  fixMapSize(); setTimeout(fixMapSize, 300);
+  // Restaurada de caché: los datos en pantalla son viejos, hay que refrescarlos.
+  if (e.persisted && typeof authToken !== 'undefined' && authToken) {
+    try { actualizarDesdeServidor(); } catch (err) {}
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { fixMapSize(); setTimeout(fixMapSize, 300); }
+});
 
 function setLayer(t) {
   if (t === 'sat') { map.removeLayer(terrLayer); satLayer.addTo(map); }
