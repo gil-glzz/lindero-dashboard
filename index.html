@@ -971,11 +971,17 @@ const ZOOM = 12;
 // ════════════════════════════════════════════════════════════
 //  ESTADO
 // ════════════════════════════════════════════════════════════
+// ⛔ IDs SEMILLA (corregido 2026-08-06). Antes eran `id: 1` fijos, y ese 1 es un imán
+// de colisiones: la primera cuenta que guarda se queda con la fila id=1, y para toda
+// cuenta posterior el UPSERT del servidor —que exige `WHERE dueno=...`— deja de
+// actualizar. El resultado era que el perfil "se reiniciaba" en cada recarga sin que
+// nadie avisara. Con Date.now() cada instalación nace con ids propios.
+const _ID_SEMILLA = Date.now();
 let lotes = [
-  { id: 1, nombre: 'Mi ganado', color: '#4ade80' }
+  { id: _ID_SEMILLA, nombre: 'Mi ganado', color: '#4ade80' }
 ];
 let animales = [
-  { id:1, nombre:'Collar 01', collar:'collar_01', lote:1, arete:'', peso:0, edad:0, raza:'Cruza', sexo:'Hembra', estado:'ok', actividad:0, bateria:100, notas:'', lat:26.9887, lng:-102.0723 }
+  { id:_ID_SEMILLA + 1, nombre:'Collar 01', collar:'collar_01', lote:_ID_SEMILLA, arete:'', peso:0, edad:0, raza:'Cruza', sexo:'Hembra', estado:'ok', actividad:0, bateria:100, notas:'', lat:26.9887, lng:-102.0723 }
 ];
 let cercas = [];
 let selectedLote = null;
@@ -1105,19 +1111,37 @@ function estaEnLinea(a) {
   return (Date.now() - a.ultimaConexion) < UMBRAL_EN_LINEA_MS;
 }
 
+// ⛔ CORREGIDO 2026-08-06: al entrar, los perfiles se cargan SIN hora de última
+// conexión (esa llega en el primer refresco de posiciones, unos segundos después),
+// así que todo aparecía "sin señal" al abrir la app aunque el collar estuviera
+// reportando. Un ganadero abriendo el teléfono a media noche veía a su ganado
+// muerto por dos segundos. "Todavía no sé" y "sin señal" son cosas distintas.
+function estadoConexion(a) {
+  if (!a.ultimaConexion && !window._ultimoRefrescoOk) return 'cargando';
+  return estaEnLinea(a) ? 'linea' : 'sin';
+}
+
 function renderAnimales() {
   Object.values(animalMarkers).forEach(m => map.removeLayer(m));
   animalMarkers = {};
   animales.forEach(a => {
     const lote = lotes.find(l => l.id === a.lote);
     const enLinea = estaEnLinea(a);
-    // Sin señal: marcador gris y semitransparente
-    const color = !enLinea ? '#6b7280' : (lote ? lote.color : '#888');
+    // ⛔ CORREGIDO 2026-08-06: el respaldo para "animal sin lote" era '#888', un gris
+    // casi idéntico al '#6b7280' de "sin señal". Dos estados MUY distintos se veían
+    // igual, y un collar reportando perfecto parecía muerto. Ahora el gris es
+    // EXCLUSIVO de "sin señal" y además se distingue por el borde punteado, para no
+    // depender solo de la opacidad (que a 18 px nadie nota).
+    const est = estadoConexion(a);
+    const color = est === 'sin' ? '#6b7280' : (lote ? lote.color : '#4ade80');
     const borderColor = a.estado === 'shock' ? '#f87171' : a.estado === 'warn' ? '#fbbf24' : 'white';
-    const opacidad = enLinea ? '1' : '0.5';
+    // "buscando" no es "sin señal": se ve atenuado pero conserva su color, para no
+    // dar el susto de un ganado gris al abrir la app.
+    const opacidad = est === 'linea' ? '1' : (est === 'cargando' ? '0.7' : '0.5');
+    const borde = est === 'linea' ? 'solid' : 'dashed';
     const icon = L.divIcon({
       className: '',
-      html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};opacity:${opacidad}"></div>`,
+      html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};border-style:${borde};opacity:${opacidad}"></div>`,
       iconSize: [18,18], iconAnchor: [9,9]
     });
     const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
@@ -1487,12 +1511,15 @@ function renderAnimalesList() {
     const lote = lotes.find(l => l.id === a.lote);
     const stColor = a.estado==='shock'?'#f87171':a.estado==='warn'?'#fbbf24':'#4ade80';
     const enLinea = estaEnLinea(a);
-    const conexion = enLinea
+    const est = estadoConexion(a);
+    const conexion = est === 'cargando'
+      ? '<span style="color:#9ca3af">◌ buscando…</span>'
+      : est === 'linea'
       ? '<span style="color:#4ade80">● en línea</span>'
       : '<span style="color:#6b7280">○ sin señal</span>';
     return `<div class="lote-card" onclick="abrirPerfilAnimal(${a.id})">
       <div class="lote-head">
-        <div class="lote-color" style="background:${safeColor(lote?lote.color:'#888')}"></div>
+        <div class="lote-color" style="background:${safeColor(lote?lote.color:'#4ade80')}"></div>
         <div class="lote-name">${esc(a.nombre)}</div>
         <div class="lote-count" style="background:${stColor}22; color:${stColor}">${esc(a.collar)}</div>
       </div>
@@ -1524,7 +1551,9 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-view').style.display = 'block';
   document.getElementById('modal-edit').style.display = 'none';
   document.getElementById('modal-avatar').textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '?';
-  document.getElementById('modal-avatar').style.background = lote ? lote.color : '#888';
+  // mismo criterio que el marcador: el gris se reserva para "sin señal", no para
+  // "sin lote" (era el círculo gris de la ficha, que también confundía)
+  document.getElementById('modal-avatar').style.background = lote ? lote.color : '#4ade80';
   document.getElementById('modal-name').textContent = a.nombre;
   document.getElementById('modal-collar').textContent = a.collar + ' · arete ' + a.arete;
   const estEl = document.getElementById('modal-estado');
@@ -1544,7 +1573,9 @@ function abrirPerfilAnimal(id) {
 
   // Datos en vivo del collar
   const ultconEl = document.getElementById('modal-ultcon');
-  if (estaEnLinea(a)) {
+  if (estadoConexion(a) === 'cargando') {
+    ultconEl.innerHTML = '<span style="color:#9ca3af">◌ Buscando…</span>';
+  } else if (estaEnLinea(a)) {
     ultconEl.innerHTML = '<span style="color:#4ade80">● En línea</span> · ' + tiempoRelativo(a.ultimaConexion);
   } else {
     ultconEl.innerHTML = '<span style="color:#6b7280">○ Sin señal</span> · ' + tiempoRelativo(a.ultimaConexion);
@@ -1665,13 +1696,24 @@ async function guardarAnimalEnServidor(a) {
       })
     });
     if (!res.ok) {
-      const t = await res.text().catch(() => '');
-      alert('No se pudo guardar el animal en el servidor. ' + (t || res.status));
+      // 409 = el id ya es de otra cuenta (ver POST /animales en el backend). Se explica
+      // con palabras y con la salida, no con un número de estado.
+      let msg = '';
+      try { const j = await res.json(); msg = j.detalle || j.error || ''; }
+      catch(e) { msg = await res.text().catch(() => ''); }
+      alert('No se guardó el animal en el servidor.\n\n' + (msg || ('Error ' + res.status)));
       return false;
     }
     // Reconciliar con lo que el servidor realmente guardó (el backend neutraliza a
     // NULL un lote inexistente): reflejarlo en memoria y avisar si pasó.
     const data = await res.json().catch(() => null);
+    if (!data || !data.animal) {
+      // El servidor contestó OK pero sin animal: eso ya no debería pasar (ahora manda
+      // 409), pero si una versión vieja del backend sigue en línea, aquí se ve.
+      alert('El servidor respondió sin confirmar el guardado. Puede que el cambio no se '
+          + 'haya conservado: sal y vuelve a entrar para comprobarlo.');
+      return false;
+    }
     if (data && data.animal) {
       const local = animales.find(x => x.id === a.id);
       const loteSrv = data.animal.lote != null ? Number(data.animal.lote) : null;
@@ -1956,6 +1998,32 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 window.addEventListener('online', () => { mostrarBannerConexion(true); if (authToken) actualizarDesdeServidor(); });
 window.addEventListener('offline', () => mostrarBannerConexion(false));
 
+// Collares que SÍ están reportando pero no tienen animal registrado con ese ID.
+// Se dibuja una barra ámbar arriba, distinta de la roja de "sin conexión", y se
+// vuelve a mostrar solo si cambia la lista (no en cada refresco de 10 s).
+function mostrarBannerHuerfanos(lista) {
+  const b0 = document.getElementById('banner-huerfanos');
+  if (!lista || !lista.length) { if (b0) b0.remove(); window._huerfanosVistos = ''; return; }
+  const firma = lista.slice().sort().join(',');
+  if (firma === window._huerfanosVistos && b0) return;   // ya está puesto y es el mismo
+  window._huerfanosVistos = firma;
+  let b = b0;
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'banner-huerfanos';
+    b.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#78350f; ' +
+      'color:#fde68a; text-align:center; padding:6px 10px; font-size:12px; z-index:2999; cursor:pointer;';
+    b.title = 'Toca para ocultar';
+    b.onclick = () => b.remove();
+    document.body.appendChild(b);
+  }
+  b.textContent = (lista.length === 1
+      ? `⚠ El collar ${lista[0]} está reportando pero no tiene animal registrado`
+      : `⚠ ${lista.length} collares reportando sin animal registrado: ${lista.join(', ')}`)
+    + ' — regístralo en Animales con ese ID exacto para verlo en el mapa.';
+  b.style.display = 'block';
+}
+
 function mostrarBannerConexion(ok) {
   let b = document.getElementById('banner-conexion');
   if (ok) { if (b) b.style.display = 'none'; return; }
@@ -1992,8 +2060,14 @@ async function actualizarDesdeServidor() {
     const res = await authFetch(`${API_BASE}/collares`);
     if (res.ok) {
       const collares = await res.json();
+      // ⛔ CORREGIDO 2026-08-06: las posiciones de un collar SIN animal registrado se
+      // descartaban en silencio. El collar reportaba bien, el servidor las guardaba, y
+      // en pantalla no aparecía nada — mandando a buscar la falla al hardware. Ahora se
+      // avisa (una sola vez por conjunto de collares desconocidos, para no fastidiar).
+      const huerfanos = [];
       collares.forEach(c => {
         const a = animales.find(x => x.collar === c.device);
+        if (!a) huerfanos.push(c.device);
         if (a) {
           a.lat = c.lat; a.lng = c.lng; a.estado = c.estado;
           if (c.shock_pwr) a.shock_pwr = c.shock_pwr;
@@ -2014,6 +2088,7 @@ async function actualizarDesdeServidor() {
       refrescarModalSiAbierto();   // C-2: repintar el perfil abierto con datos en vivo
       window._ultimoRefrescoOk = Date.now();
       mostrarBannerConexion(true);
+      mostrarBannerHuerfanos(huerfanos);
     } else { mostrarBannerConexion(false); }
   } catch(e) { mostrarBannerConexion(false); }
 

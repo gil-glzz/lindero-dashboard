@@ -8,7 +8,13 @@
  *  - Escrituras (POST/PATCH/DELETE) y todo lo no-GET: pasan directo a la red (no se cachean).
  * NOTA: un Service Worker solo se activa sobre HTTPS o localhost (no file://).
  */
-const VER = 'lindero-v1';
+// ⚠ SUBIR ESTE NÚMERO EN CADA DESPLIEGUE. El shell (index.html incluido) se sirve
+// cache-first, así que sin cambiar `VER` el navegador seguiría dando la versión
+// vieja aunque GitHub Pages ya tenga la nueva. `activate` borra toda caché que no
+// empiece con el VER actual, así que subirlo es lo único que hace falta.
+//   v2 (2026-08-06): arreglos de fallas silenciosas — ids semilla, gris ambiguo,
+//                    aviso de collar huérfano y "buscando…" al arrancar.
+const VER = 'lindero-v2';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
