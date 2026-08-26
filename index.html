@@ -1122,6 +1122,7 @@ function catCerca(c) { return CATEGORIAS_CERCA[c] || CATEGORIAS_CERCA.potrero; }
 
 // ¿El collar está reportando? (en línea si reportó hace < 5 min)
 const UMBRAL_EN_LINEA_MS = 5 * 60 * 1000;   // 5 minutos
+const GRACIA_BUSCANDO_MS = 20 * 1000;       // margen para la primera posición
 function estaEnLinea(a) {
   if (!a.ultimaConexion) return false;
   return (Date.now() - a.ultimaConexion) < UMBRAL_EN_LINEA_MS;
@@ -1133,7 +1134,22 @@ function estaEnLinea(a) {
 // reportando. Un ganadero abriendo el teléfono a media noche veía a su ganado
 // muerto por dos segundos. "Todavía no sé" y "sin señal" son cosas distintas.
 function estadoConexion(a) {
-  if (!a.ultimaConexion && !window._ultimoRefrescoOk) return 'cargando';
+  // ⛔ CORREGIDO 2026-08-26: la guarda de abajo exigía que NINGÚN refresco hubiera
+  // funcionado aún, así que solo cubría el arranque de la app. Un animal RECIÉN
+  // REGISTRADO —que todavía no tiene hora de última conexión porque su primera
+  // posición llega en el siguiente refresco— caía directo a "sin señal" aunque su
+  // collar estuviera reportando bien. Se vio en campo: collar_02 subiendo posiciones
+  // cada 60 s, el mapa pintando su punto, el encabezado contando "0 sin señal", y la
+  // tarjeta del animal diciendo lo contrario. Ahora "todavía no sé" es "buscando"
+  // SIEMPRE, no solo al abrir la app.
+  if (!a.ultimaConexion) {
+    // "Todavía no sé" y "sin señal" son cosas distintas, pero "todavía no sé"
+    // no puede durar para siempre: un animal recién registrado tiene unos
+    // segundos de gracia mientras llega su primera posición, y pasado ese
+    // plazo el silencio ya es una respuesta.
+    if (!a._buscandoDesde) a._buscandoDesde = Date.now();
+    return (Date.now() - a._buscandoDesde < GRACIA_BUSCANDO_MS) ? 'cargando' : 'sin';
+  }
   return estaEnLinea(a) ? 'linea' : 'sin';
 }
 
@@ -2100,7 +2116,13 @@ async function actualizarDesdeServidor() {
           if (c.reinicios_anormales != null) a.reinicios = c.reinicios_anormales;
         }
       });
-      renderAnimales(); renderLotes();
+      // ⛔ CORREGIDO 2026-08-26: aquí se redibujaba el MAPA (renderAnimales) y los
+      //  lotes, pero NUNCA la barra lateral (renderAnimalesList). Las tarjetas se
+      //  quedaban congeladas con los datos crudos de /animales: sin hora de
+      //  conexión y con la batería por omisión. Sintoma en campo: los puntos del
+      //  mapa se movían y el encabezado contaba bien, mientras las tarjetas decían
+      //  "sin señal" y "100 %" de dos collares que estaban reportando cada 60 s.
+      renderAnimales(); renderAnimalesList(); renderLotes();
       refrescarModalSiAbierto();   // C-2: repintar el perfil abierto con datos en vivo
       window._ultimoRefrescoOk = Date.now();
       mostrarBannerConexion(true);

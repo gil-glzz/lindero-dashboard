@@ -17,7 +17,10 @@
 //   v3 (2026-08-06): el mapa se rompía al volver de pruebas.html con Atrás
 //                    (bfcache: no se dispara `load`, Leaflet queda con el
 //                    tamaño viejo y los mosaicos salen regados).
-const VER = 'lindero-v3';
+//   v4 (2026-08-26): las tarjetas de animales nunca se redibujaban — el refresco
+//                    pintaba el mapa pero no la barra lateral, así que decían
+//                    "sin señal" y "100 %" de collares que reportaban cada 60 s.
+const VER = 'lindero-v4';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
