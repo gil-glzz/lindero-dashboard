@@ -20,7 +20,9 @@
 //   v4 (2026-08-26): las tarjetas de animales nunca se redibujaban — el refresco
 //                    pintaba el mapa pero no la barra lateral, así que decían
 //                    "sin señal" y "100 %" de collares que reportaban cada 60 s.
-const VER = 'lindero-v4';
+//   v5 (2026-08-26): mas zoom para mirar rastros (hasta 22, escalando el ultimo
+//                    mosaico) e ID visual del animal sobre la bolita.
+const VER = 'lindero-v5';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;

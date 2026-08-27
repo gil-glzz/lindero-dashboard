@@ -185,7 +185,24 @@
   .animal-marker {
     border-radius: 50%; border: 2px solid white;
     box-shadow: 0 0 0 2px rgba(0,0,0,.3);
+    position: relative;              /* ancla para la etiqueta de arete */
   }
+  /* 🆕 2026-08-26 — El ARETE sobre la bolita. Es el identificador DEL RANCHERO,
+     independiente del collar: un animal puede cambiar de collar y sigue siendo
+     el mismo arete. Se escribe en el perfil del animal.
+     Sin recuadro y con sombra dura en vez de fondo: sobre imagen satelital un
+     rectángulo blanco tapa justo lo que se quiere ver, y la sombra da contraste
+     tanto sobre tierra clara como sobre vegetación oscura. */
+  .animal-id {
+    position: absolute; bottom: calc(100% + 5px); left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    color: #fff; white-space: nowrap; pointer-events: none;
+    text-shadow: 0 0 3px #000, 0 0 6px #000, 0 1px 2px #000;
+  }
+  /* Debajo de cierto acercamiento las etiquetas se encinan y estorban más de lo
+     que ayudan, así que el mapa las esconde solo. */
+  .mapa-sin-ids .animal-id { display: none; }
   .scroll-thin::-webkit-scrollbar { width: 6px; }
   .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
@@ -656,6 +673,7 @@
       <div class="field"><label>Nombre / apodo</label><input id="ed-nombre"/></div>
       <div class="field"><label>ID del collar</label><input id="ed-collar" placeholder="collar_01"/></div>
       <div class="field"><label>Arete oficial (SINIIGA)</label><input id="ed-arete"/></div>
+      <div class="field"><label>ID visual (se ve en el mapa)</label><input id="ed-idvisual" maxlength="8" placeholder="corto: 42, A-7, ROJA"/></div>
       <div class="modal-grid">
         <div class="field"><label>Peso (kg)</label><input id="ed-peso" type="number"/></div>
         <div class="field"><label>Edad (meses)</label><input id="ed-edad" type="number"/></div>
@@ -995,7 +1013,29 @@ let tempMarkers = [];
 // ════════════════════════════════════════════════════════════
 //  MAPA
 // ════════════════════════════════════════════════════════════
-const map = L.map('map', { zoomControl: false }).setView(CENTRO, ZOOM);
+// 🆕 2026-08-26 — MAS ZOOM PARA MIRAR RASTROS, sin cambiar ningun tamano de la
+//  interfaz. El techo lo pone el MAPA y no cada capa, asi que conmutar entre
+//  satelite y terreno ya no cambia hasta donde se puede acercar.
+//  Como funciona: las capas de satelite no tienen mosaicos mas alla de cierto
+//  nivel (Esri llega a 18). Con maxNativeZoom Leaflet sigue acercando y ESCALA el
+//  ultimo mosaico disponible: la foto se ve borrosa, pero el rastro, los puntos y
+//  la cerca son VECTORES y siguen nitidos — que es justo lo que se quiere mirar.
+//  Nota honesta: pasado el nivel ~20 se esta viendo la dispersion del GPS (2-3 m)
+//  y no detalle real del recorrido.
+const map = L.map('map', { zoomControl: false, maxZoom: 22 }).setView(CENTRO, ZOOM);
+
+// 🆕 2026-08-26: las etiquetas de arete solo cuando el acercamiento las hace
+//  legibles. Con el hato entero a la vista se encimarian y taparian el mapa.
+const ZOOM_MIN_IDS = 16;
+// Que se pinta sobre la bolita. El ID VISUAL manda: es corto y existe para
+// reconocer al animal de un vistazo. Si no se ha escrito, cae al arete, que
+// suele estar y sirve igual — asi el mapa es util desde el primer dia sin
+// obligar a llenar un campo mas. Si no hay ninguno, no se dibuja nada.
+function etiquetaMapa(a) { return (a.id_visual || '').trim() || (a.arete || '').trim(); }
+function ajustarEtiquetasArete() {
+  map.getContainer().classList.toggle('mapa-sin-ids', map.getZoom() < ZOOM_MIN_IDS);
+}
+map.on('zoomend', ajustarEtiquetasArete);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // Encuadra el mapa a TODO lo del rancho (cercas + collares + aguajes). Se llama una vez
@@ -1018,18 +1058,18 @@ function encuadrarTodo() {
 const SAT_PROVIDERS = {
   esri: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    opts: { attribution: 'Esri', maxZoom: 19, maxNativeZoom: 18 }
+    opts: { attribution: 'Esri', maxZoom: 22, maxNativeZoom: 18 }
   },
   google: {
     url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    opts: { attribution: 'Google', maxZoom: 21, subdomains: ['0','1','2','3'] }
+    opts: { attribution: 'Google', maxZoom: 22, maxNativeZoom: 21, subdomains: ['0','1','2','3'] }
   }
 };
 let satProviderActual = 'esri';
 let satLayer = L.tileLayer(SAT_PROVIDERS.esri.url, SAT_PROVIDERS.esri.opts);
 
 const terrLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: 'OpenStreetMap', maxZoom: 19
+  attribution: 'OpenStreetMap', maxZoom: 22, maxNativeZoom: 19
 });
 satLayer.addTo(map);
 
@@ -1173,7 +1213,9 @@ function renderAnimales() {
     const borde = est === 'linea' ? 'solid' : 'dashed';
     const icon = L.divIcon({
       className: '',
-      html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};border-style:${borde};opacity:${opacidad}"></div>`,
+      html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};border-style:${borde};opacity:${opacidad}">`
+          + (etiquetaMapa(a) ? `<span class="animal-id">${esc(etiquetaMapa(a))}</span>` : '')
+          + `</div>`,
       iconSize: [18,18], iconAnchor: [9,9]
     });
     const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
@@ -1181,6 +1223,7 @@ function renderAnimales() {
     m.bindTooltip(esc(a.nombre) + (enLinea ? '' : ' (sin señal)'), { direction: 'top', offset: [0,-10] });
     animalMarkers[a.id] = m;
   });
+  ajustarEtiquetasArete();
 }
 
 function renderCercas() {
@@ -1600,7 +1643,8 @@ function abrirPerfilAnimal(id) {
   const batEl = document.getElementById('modal-bateria');
   batEl.textContent = bateriaIcono(a.bateria) + ' ' + a.bateria + '%' + (a.carga === 1 ? ' ⚡ cargando' : '');
   batEl.style.color = bateriaColor(a.bateria);
-  document.getElementById('modal-arete').textContent = a.arete || '—';
+  document.getElementById('modal-arete').textContent =
+    (a.arete || '—') + (a.id_visual ? '  ·  visual: ' + a.id_visual : '');
   document.getElementById('modal-notas').textContent = a.notas || 'Sin notas';
 
   // Datos en vivo del collar
@@ -1662,7 +1706,7 @@ function abrirNuevoAnimal() {
   document.getElementById('modal-avatar').style.background = '#4ade80';
   document.getElementById('modal-name').textContent = 'Nuevo animal';
   document.getElementById('modal-collar').textContent = '';
-  ['ed-nombre','ed-collar','ed-arete','ed-peso','ed-edad','ed-notas'].forEach(i=>document.getElementById(i).value='');
+  ['ed-nombre','ed-collar','ed-arete','ed-idvisual','ed-peso','ed-edad','ed-notas'].forEach(i=>document.getElementById(i).value='');
   refreshCercaLoteSelect();
   document.getElementById('modal-animal').classList.add('open');
 }
@@ -1675,6 +1719,7 @@ function editarAnimal() {
   document.getElementById('ed-nombre').value = a.nombre;
   document.getElementById('ed-collar').value = a.collar;
   document.getElementById('ed-arete').value = a.arete;
+  document.getElementById('ed-idvisual').value = a.id_visual || '';
   document.getElementById('ed-peso').value = a.peso;
   document.getElementById('ed-edad').value = a.edad;
   document.getElementById('ed-raza').value = a.raza;
@@ -1689,6 +1734,7 @@ function guardarAnimal() {
     nombre: document.getElementById('ed-nombre').value || 'Sin nombre',
     collar: document.getElementById('ed-collar').value || 'collar_??',
     arete: document.getElementById('ed-arete').value,
+    id_visual: document.getElementById('ed-idvisual').value.trim(),
     peso: parseInt(document.getElementById('ed-peso').value) || 0,
     edad: parseInt(document.getElementById('ed-edad').value) || 0,
     raza: document.getElementById('ed-raza').value,
@@ -1722,7 +1768,7 @@ async function guardarAnimalEnServidor(a) {
     const res = await authFetch(`${API_BASE}/animales`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: a.id, nombre: a.nombre, collar: a.collar, arete: a.arete,
+        id: a.id, nombre: a.nombre, collar: a.collar, arete: a.arete, id_visual: a.id_visual || '',
         peso: a.peso, edad: a.edad, raza: a.raza, sexo: a.sexo,
         lote: a.lote, notas: a.notas
       })
@@ -2001,7 +2047,7 @@ async function cargarPerfilesIniciales() {
       const data = await res.json();
       if (data.length) {
         animales = data.map(a => ({
-          id: Number(a.id), nombre: a.nombre, collar: a.collar, arete: a.arete,
+          id: Number(a.id), nombre: a.nombre, collar: a.collar, arete: a.arete, id_visual: a.id_visual || '',
           peso: a.peso, edad: a.edad, raza: a.raza, sexo: a.sexo,
           lote: a.lote ? Number(a.lote) : null, notas: a.notas,
           estado: 'ok', actividad: 0, bateria: 100,
