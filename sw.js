@@ -17,7 +17,7 @@
 //   v3 (2026-08-06): el mapa se rompía al volver de pruebas.html con Atrás
 //                    (bfcache: no se dispara `load`, Leaflet queda con el
 //                    tamaño viejo y los mosaicos salen regados).
-const VER = 'lindero-v6';   // 2026-08-29: area del potrero visible en la tarjeta de cada cerca
+const VER = 'lindero-v7';   // 2026-08-29: el area al tamaño del resto de la tarjeta
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
