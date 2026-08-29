@@ -664,6 +664,16 @@
 
       <div class="field"><label>Arete / ID</label><div id="modal-arete" style="font-size:14px">—</div></div>
       <div class="field"><label>Notas sanitarias</label><div id="modal-notas" style="font-size:14px; line-height:1.5">—</div></div>
+      <!-- 🆕 2026-08-27 — BIENESTAR. Nodos ESTATICOS a proposito: el modal se
+           repinta en cada refresco (refrescarModalSiAbierto) y un boton
+           recreado por innerHTML pierde el clic que caiga justo en el
+           repintado. Aqui solo se cambian texto, display y disabled. -->
+      <div id="modal-bienestar" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:rgba(251,191,36,.10); border:1px solid rgba(251,191,36,.30)">
+        <div style="color:#fbbf24; font-weight:600; font-size:13px">⛔ Estímulo bloqueado por bienestar</div>
+        <div id="bienestar-detalle" style="font-size:12px; color:#9ca3af; margin-top:6px; line-height:1.5">—</div>
+        <button class="btn" id="btn-desbloqueo" onclick="pedirDesbloqueo()" style="margin-top:10px">🔓 Pedir desbloqueo</button>
+      </div>
+
       <button class="btn btn-primary" onclick="verRecorrido()" style="margin-top:8px">📍 Ver recorrido en el mapa</button>
       <button class="btn" onclick="descargarRecorridoCSV()" style="margin-top:8px">⬇️ Descargar recorrido (CSV)</button>
       <button class="btn" onclick="editarAnimal()" style="margin-top:8px">Editar perfil</button>
@@ -1242,7 +1252,8 @@ function renderCercas() {
       dashArray: esSimbolica ? '1 5' : (!activa ? '4 8' : (c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null))
     }).addTo(map);
     const cat = catCerca(c.categoria);
-    let popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · ${esc(c.tipo)}${activa ? '' : ' · inactiva'}`;
+    let popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · ${esc(c.tipo)}${activa ? '' : ' · inactiva'}`
+              + `<br>Área: <b>${textoArea(areaPoligonoM2(c.poligono))}</b>`;
     if (esSimbolica) popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · solo referencia visual`;
     if (c.expiraEn) {
       const ms = c.expiraEn - Date.now();
@@ -1600,7 +1611,7 @@ function renderAnimalesList() {
       </div>
       <div class="lote-meta">
         <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${esc(a.bateria)}%${a.carga === 1 ? ' ⚡' : ''}</span>
-      </div>
+      </div>${(a.bloqueado && enLinea) ? '<div class="lote-meta"><span style="color:#fbbf24">⛔ estímulo bloqueado</span></div>' : ''}
     </div>`;
   }).join('');
 }
@@ -1675,7 +1686,69 @@ function abrirPerfilAnimal(id) {
   document.getElementById('modal-frescura').innerHTML =
     estaEnLinea(a) ? ' · <span style="color:#4ade80">● en vivo</span>' : ' · <span style="color:#6b7280">○ sin señal</span>';
 
+  renderBienestar(a);
+
   document.getElementById('modal-animal').classList.add('open');
+}
+
+// 🆕 2026-08-27 — Estado del bloqueo de bienestar y el botón para levantarlo.
+//  El botón solo se habilita si el animal aparece DENTRO de su cerca, que es lo
+//  que pidió Gilberto. Pero eso aquí es una ADVERTENCIA, no una promesa: quien
+//  decide de verdad es el collar, con su propia posición recién medida y contra
+//  el polígono que él recibió (truncado a 10 vértices, que no siempre es el
+//  mismo que dibuja el tablero). Por eso el texto no promete que se aplicará.
+function renderBienestar(a) {
+  const caja = document.getElementById('modal-bienestar');
+  const det  = document.getElementById('bienestar-detalle');
+  const btn  = document.getElementById('btn-desbloqueo');
+  if (!caja || !det || !btn) return;
+
+  if (!a.bloqueado) { caja.style.display = 'none'; return; }
+  caja.style.display = 'block';
+  btn.dataset.collar = a.collar || '';
+
+  const enLinea = estaEnLinea(a);
+  // 9999 es el centinela de "sin cerca" que manda el collar. Sin esta prueba,
+  // 'ok' también significa "no había ninguna cerca contra la cual estar dentro"
+  // (el gateway lo pone por omisión), y el botón se encendería para un collar
+  // que nunca podrá cumplir la condición.
+  const conCerca = a.distBorde != null && Number(a.distBorde) < 9000;
+  const dentro   = conCerca && (a.estado === 'ok' || a.estado === 'warn');
+  const orden    = (window.desbloqueosEstado || {})[a.collar];
+
+  let texto, activo = false;
+  btn.textContent = '🔓 Pedir desbloqueo';
+  if (orden && orden.estado === 'pendiente') {
+    texto = 'Orden enviada. El collar la aplicará en cuanto confirme que el animal '
+          + 'está dentro. Si no puede en 15 minutos, caduca sola.';
+    btn.textContent = '⏳ Esperando al collar…';
+  } else if (!enLinea) {
+    texto = 'El collar no está reportando, así que no hay por dónde hacerle llegar '
+          + 'la orden. El bloqueo mostrado es el último que se supo.';
+  } else if (a.arreo) {
+    texto = 'Hay un arreo activo: durante el arreo no se aplica estímulo de todos '
+          + 'modos, y no se sabe si el animal está dentro o fuera.';
+  } else if (!conCerca) {
+    texto = 'Este collar no tiene una cerca contra la cual estar dentro, así que no '
+          + 'podría aplicar la orden. Asígnale una geocerca primero.';
+  } else if (!dentro) {
+    texto = 'El animal aparece FUERA de su cerca. El desbloqueo solo puede pedirse '
+          + 'con el animal dentro.';
+  } else {
+    texto = 'El animal aparece dentro de su cerca. El collar volverá a comprobarlo '
+          + 'por su cuenta antes de aplicarlo, y los topes de bienestar '
+          + '(3 en 15 min, 10 en 24 h) siguen vigentes.';
+    if (orden && orden.estado === 'aplicado')
+      texto = 'La orden anterior sí se aplicó, pero el collar volvió a bloquearse. '
+            + 'Puedes pedirlo otra vez. ' + texto;
+    else if (orden && orden.estado === 'caducado')
+      texto = 'La orden anterior caducó sin poder aplicarse. ' + texto;
+    activo = true;
+  }
+  det.textContent = texto;
+  btn.disabled = !activo;
+  btn.style.opacity = activo ? '1' : '.5';
+  btn.style.cursor  = activo ? 'pointer' : 'not-allowed';
 }
 
 // Formatea una marca de tiempo como "hace 3 min", "hace 2 h", etc.
@@ -2160,6 +2233,15 @@ async function actualizarDesdeServidor() {
           if (c.snr != null)        a.snr = c.snr;
           if (c.firmware)           a.firmware = c.firmware;
           if (c.reinicios_anormales != null) a.reinicios = c.reinicios_anormales;
+          // 🆕 2026-08-27 — BLOQUEO DE BIENESTAR. El dato viajaba desde el collar
+          //  ("bl"), lo guardaba el servidor (posiciones.bloqueado) y GET /collares
+          //  lo devolvia; el tablero era el unico eslabon que no lo miraba.
+          //  Asignacion DIRECTA y no `if (x != null)`: es un booleano que tiene que
+          //  poder APAGARSE. Con la guarda de los otros campos se quedaria pegado en
+          //  "bloqueado" para siempre en cuanto el collar se desbloqueara, que es
+          //  justo el estado que hay que ver cambiar.
+          a.bloqueado = !!c.bloqueado;
+          a.arreo     = !!c.arreo;
         }
       });
       // ⛔ CORREGIDO 2026-08-26: aquí se redibujaba el MAPA (renderAnimales) y los
@@ -2168,6 +2250,14 @@ async function actualizarDesdeServidor() {
       //  conexión y con la batería por omisión. Sintoma en campo: los puntos del
       //  mapa se movían y el encabezado contaba bien, mientras las tarjetas decían
       //  "sin señal" y "100 %" de dos collares que estaban reportando cada 60 s.
+      // 🆕 2026-08-27: el estado de las órdenes de desbloqueo, ANTES de repintar
+      //  el modal para que el botón no se dibuje con datos de hace 5 s. Solo se
+      //  pide si hay algo que mirar: sin ningún collar bloqueado ni ninguna
+      //  orden viva, esta petición no aportaría nada y correría cada 5 s.
+      if (animales.some(x => x.bloqueado) ||
+          Object.keys(window.desbloqueosEstado || {}).length)
+        await cargarDesbloqueos();
+
       renderAnimales(); renderAnimalesList(); renderLotes();
       refrescarModalSiAbierto();   // C-2: repintar el perfil abierto con datos en vivo
       window._ultimoRefrescoOk = Date.now();
@@ -2389,6 +2479,51 @@ async function iniciarArreo() {
     if (!res.ok) { alert(data.error || 'No se pudo iniciar el arreo'); return; }
     await cargarArreo();
   } catch(e) { alert('Sin conexión. Intenta de nuevo.'); }
+}
+
+// 🆕 2026-08-27 — DESBLOQUEO DE BIENESTAR ─────────────────────────────────
+window.desbloqueosEstado = {};
+
+async function cargarDesbloqueos() {
+  try {
+    const res = await authFetch(`${API_BASE}/desbloqueos`);
+    if (!res.ok) return;                       // se conserva lo último conocido
+    const filas = await res.json();
+    const mapa = {};
+    filas.forEach(f => { mapa[f.device] = f; });
+    window.desbloqueosEstado = mapa;
+  } catch (e) { /* sin red: el botón se queda como estaba */ }
+}
+
+async function pedirDesbloqueo() {
+  const btn = document.getElementById('btn-desbloqueo');
+  const collar = btn && btn.dataset.collar;
+  if (!collar) return;
+  if (!confirm(
+      'Vas a pedirle al collar ' + collar + ' que levante el bloqueo de bienestar.\n\n' +
+      'El collar lo aplicará solo si confirma por su cuenta que el animal está ' +
+      'dentro de la cerca. Los topes de 3 estímulos en 15 minutos y 10 en 24 horas ' +
+      'siguen vigentes y no se tocan.\n\n¿Continuar?')) return;
+
+  // Deshabilitar ANTES del fetch. Ningún botón de este tablero lo hace, y en el
+  // arreo da igual porque el servidor cierra el anterior antes de abrir el
+  // nuevo; aquí un doble clic crearía dos órdenes para el mismo collar.
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try {
+    const res = await authFetch(`${API_BASE}/desbloqueo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: collar })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'No se pudo enviar la orden'); return; }
+    await cargarDesbloqueos();
+  } catch (e) {
+    alert('Sin conexión con el servidor. La orden no se envió.');
+  } finally {
+    refrescarModalSiAbierto();   // vuelve a pintar el botón con su estado real
+  }
 }
 
 async function terminarArreo() {
@@ -2800,6 +2935,40 @@ async function borrarInstalacion(id) {
 }
 
 
+// 🆕 2026-08-27 — ÁREA DEL POTRERO. Fórmula del cordón (shoelace) sobre una
+//  proyección local en metros: a la latitud del propio potrero, un grado de
+//  longitud vale 111320·cos(lat) metros y uno de latitud 110540. Para potreros
+//  de hectáreas el error de esa aproximación es despreciable, y evita meter una
+//  librería geodésica entera para esto.
+//  Sirve para algo más que informar: se midió que en un potrero de 0.34 ha una
+//  banda de aviso de 10 m cubre el 57 % del área, y en uno de 6.5 ha solo el
+//  15 %. Ver el área junto a la cerca es lo que permite elegir esa banda.
+function areaPoligonoM2(poly) {
+  if (!poly || poly.length < 3) return 0;
+  const latRef = poly.reduce((s, p) => s + Number(p.lat), 0) / poly.length;
+  const kx = 111320 * Math.cos(latRef * Math.PI / 180);
+  const ky = 110540;
+  let acc = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const j = (i + 1) % poly.length;
+    const xi = Number(poly[i].lng) * kx, yi = Number(poly[i].lat) * ky;
+    const xj = Number(poly[j].lng) * kx, yj = Number(poly[j].lat) * ky;
+    acc += xi * yj - xj * yi;
+  }
+  return Math.abs(acc) / 2;
+}
+
+// Una hectárea son 10 000 m². Abajo de eso el número en hectáreas sería un
+// "0.34" que no dice nada a quien camina el terreno; en metros cuadrados sí.
+function textoArea(m2) {
+  if (!m2 || !isFinite(m2) || m2 <= 0) return '—';
+  if (m2 >= 10000) {
+    const ha = m2 / 10000;
+    return ha.toFixed(ha < 10 ? 2 : 1) + ' ha';
+  }
+  return Math.round(m2).toLocaleString('es-MX') + ' m²';
+}
+
 function renderCercasList() {
   const cont = document.getElementById('cercas-list');
   if (!cont) return;
@@ -2822,7 +2991,11 @@ function renderCercasList() {
         <button onclick="event.stopPropagation(); abrirEditarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;">Editar</button>
         <button onclick="event.stopPropagation(); borrarCerca(${c.id})" style="font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid var(--danger); background:transparent; color:var(--danger); cursor:pointer;">Borrar</button>
       </div>
-      <div class="lote-meta" style="margin-top:8px; align-items:center;">
+      <div style="margin-top:8px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:19px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; letter-spacing:-.01em;">${textoArea(areaPoligonoM2(c.poligono))}</span>
+        <span style="font-size:12px; color:var(--text-dim);">de superficie</span>
+      </div>
+      <div class="lote-meta" style="margin-top:6px; align-items:center;">
         <span>${esc(catCerca(c.categoria).label)} · ${tipoLabel}</span><span>${c.poligono.length} vértices${timer}</span>
         <label style="margin-left:auto; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="event.stopPropagation();">
           <span style="color:${activa?'#4ade80':'var(--text-dim)'}; font-weight:500;">${activa?'Activa':'Inactiva'}</span>
