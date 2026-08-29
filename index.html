@@ -521,6 +521,13 @@
           <input id="ec-nombre"/>
         </div>
         <div class="field">
+          <label>¿A quién cerca?</label>
+          <select id="ec-lote"></select>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+            Si eliges un lote, la cerca sigue al lote: el animal que metas
+            después la hereda solo.</p>
+        </div>
+        <div class="field">
           <label>Categoría</label>
           <select id="ec-categoria">
             <option value="potrero">🌿 Potrero</option>
@@ -1338,8 +1345,11 @@ map.on('dblclick', (e) => {
 
 function guardarCercaActual() {
   if (currentPolyPts.length < 3) { alert('Dibuja al menos 3 puntos'); return; }
-  const loteId = parseInt(document.getElementById('cerca-lote').value);
-  const lote = lotes.find(l => l.id === loteId);
+  // 🆕 2026-08-29: "" = todo el rancho (sin lote). parseInt("") da NaN, asi que
+  // se distingue explicitamente en vez de dejar que NaN se cuele como lote.
+  const loteRaw = document.getElementById('cerca-lote').value;
+  const loteId = loteRaw === '' ? null : parseInt(loteRaw);
+  const lote = loteId === null ? null : lotes.find(l => l.id === loteId);
   const tipo = document.getElementById('cerca-tipo').value;
   const categoria = document.getElementById('cerca-categoria')?.value || 'potrero';
   const horas = parseInt(document.getElementById('cerca-horas').value) || 6;
@@ -1356,7 +1366,16 @@ function guardarCercaActual() {
          : catCerca(categoria).color,
     warn_dist_m: warnDist,
     poligono: currentPolyPts.map(p => ({ lat: p[0], lng: p[1] })),
-    collares: animales.filter(a => a.lote === loteId).map(a => a.collar),
+    // 🆕 2026-08-29 — SE GUARDA EL LOTE, NO SUS COLLARES.
+    //  Antes aqui iba `animales.filter(a => a.lote === loteId).map(a => a.collar)`:
+    //  una FOTO de quien estaba en el lote al dibujar. El animal que entraba al
+    //  lote al dia siguiente no aparecia en esa lista nunca mas, y en el servidor
+    //  su collar quedaba sin cerca. Ahora la pertenencia la resuelve el servidor
+    //  en cada consulta contra el lote actual del animal: metes el animal al lote
+    //  y hereda la cerca sola. 'collares' se deja vacio a proposito — con lote,
+    //  el servidor lo ignora; sin lote, vacio significa "todo el rancho".
+    lote: loteId,
+    collares: [],
     expiraEn: tipo === 'temporal' ? Date.now() + horas*3600000 : null
   };
   cercas.push(cerca);
@@ -1418,7 +1437,7 @@ async function enviarCercaAlServidor(cerca) {
   const payload = {
     nombre: cerca.nombre, tipo: cerca.tipo, categoria: cerca.categoria || 'potrero',
     poligono: cerca.poligono, warn_dist_m: cerca.warn_dist_m,
-    color: cerca.color, collares: cerca.collares,
+    color: cerca.color, collares: cerca.collares, lote: cerca.lote ?? null,
     ...(cerca.tipo === 'temporal' ? { horas: Math.round((cerca.expiraEn - Date.now())/3600000) } : {})
   };
   try {
@@ -1460,7 +1479,7 @@ function renderLotes() {
     const fuera    = enLinea.filter(a => a.estado === 'shock').length;
     const aviso    = enLinea.filter(a => a.estado === 'warn').length;
     const dentro   = enLinea.length - fuera - aviso;
-    const cercaLote = cercas.find(c => c.collares?.some(col => animales.find(a => a.collar===col && a.lote===l.id)));
+    const cercaLote = cercaQueAplica(null, l.id);
     return `<div class="lote-card ${selectedLote===l.id?'selected':''}" onclick="selectLote(${l.id})">
       <div class="lote-head">
         <div class="lote-color" style="background:${safeColor(l.color)}"></div>
@@ -1583,9 +1602,37 @@ function refreshCercaLoteSelect() {
     const sel = document.getElementById(selId);
     if (!sel) return;
     const val = sel.value;
-    sel.innerHTML = lotes.map(l => `<option value="${l.id}">${esc(l.nombre)}</option>`).join('');
+    // 🆕 2026-08-29: opcion "todo el rancho". Es la unica que hace que un collar
+    // dado de alta MAÑANA quede cercado sin tocar nada: en el servidor una cerca
+    // sin lote y con lista vacia aplica a todos los collares del rancho, hoy y
+    // despues. Va primero porque es la respuesta correcta para el rancho de un
+    // solo potrero, que es el caso comun.
+    const opTodos = (selId === 'cerca-lote')
+      ? '<option value="">Todo el rancho (incluye collares nuevos)</option>' : '';
+    sel.innerHTML = opTodos + lotes.map(l => `<option value="${l.id}">${esc(l.nombre)}</option>`).join('');
     if (val) sel.value = val;
   });
+}
+
+// 🆕 2026-08-29 — ¿QUE CERCA GOBIERNA A ESTE COLLAR?
+//  Espeja EXACTAMENTE la regla del servidor (ver GET /geovallas): lote vivo,
+//  o cerca del rancho entero, o lista explicita de las cercas viejas. Se
+//  duplica a proposito: el ranchero necesita VER aqui lo que el servidor va a
+//  contestar, y sin este espejo un collar sin cerca no se nota hasta que el
+//  animal cruza un lindero que nadie le puso.
+//  Solo cuenta la CONTENCION: una zona de exclusion no cerca a nadie, marca un
+//  lugar prohibido. Un animal con solo exclusiones esta suelto.
+function cercaQueAplica(collar, loteId) {
+  const a = collar ? animales.find(x => x.collar === collar) : null;
+  const lote = loteId !== undefined ? loteId : (a ? a.lote : null);
+  return cercas.find(c => {
+    if (c.activa === false || c.tipo === 'simbolica' || c.tipo === 'exclusion') return false;
+    if (c.lote != null) return lote != null && c.lote === lote;
+    if (!c.collares || !c.collares.length) return true;      // sin lote ni lista = todo el rancho
+    if (collar && c.collares.includes(collar)) return true;  // lista explicita (cercas viejas)
+    return loteId !== undefined &&
+           c.collares.some(col => animales.some(x => x.collar === col && x.lote === loteId));
+  }) || null;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1611,7 +1658,9 @@ function renderAnimalesList() {
       </div>
       <div class="lote-meta">
         <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${esc(a.bateria)}%${a.carga === 1 ? ' ⚡' : ''}</span>
-      </div>${(a.bloqueado && enLinea) ? '<div class="lote-meta"><span style="color:#fbbf24">⛔ estímulo bloqueado</span></div>' : ''}
+      </div>${(a.bloqueado && enLinea) ? '<div class="lote-meta"><span style="color:#fbbf24">⛔ estímulo bloqueado</span></div>' : ''}${
+        cercaQueAplica(a.collar) ? '' :
+        '<div class="lote-meta"><span style="color:#fbbf24">⚠ sin cerca asignada</span></div>'}
     </div>`;
   }).join('');
 }
@@ -2281,6 +2330,7 @@ async function actualizarDesdeServidor() {
         activa: g.activa !== false,
         poligono: typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono,
         collares: typeof g.collares === 'string' ? JSON.parse(g.collares) : (g.collares || []),
+        lote: g.lote ?? null,
         expiraEn: g.expira_en ? new Date(g.expira_en).getTime() : null,
         delServidor: true
       }));
@@ -3033,6 +3083,21 @@ function abrirEditarCerca(id) {
   const selCat = document.getElementById('ec-categoria'); if (selCat) selCat.value = c.categoria || 'potrero';
   const inW = document.getElementById('ec-warn'); if (inW) inW.value = c.warn_dist_m || 10;
 
+  // 🆕 2026-08-29 — a quien cerca. Tres estados, y el tercero importa:
+  //  una cerca vieja con lista fija ("collares":["collar_01"]) NO puede
+  //  presentarse como "todo el rancho", porque guardarla sin tocar nada la
+  //  ensancharia en silencio a collares que hoy no cerca. Para esas se ofrece
+  //  primero "no cambiar", y solo si el ranchero elige otra cosa se reescribe.
+  const selLote = document.getElementById('ec-lote');
+  if (selLote) {
+    const listaFija = (c.lote == null && c.collares && c.collares.length);
+    selLote.innerHTML =
+      (listaFija ? `<option value="__mantener__">Lista fija actual (${c.collares.map(esc).join(', ')})</option>` : '') +
+      '<option value="">Todo el rancho (incluye collares nuevos)</option>' +
+      lotes.map(l => `<option value="${l.id}">${esc(l.nombre)}</option>`).join('');
+    selLote.value = listaFija ? '__mantener__' : (c.lote != null ? String(c.lote) : '');
+  }
+
   // Paleta de colores (marcar el actual)
   const cont = document.getElementById('ec-colors');
   cont.innerHTML = '';
@@ -3197,6 +3262,7 @@ async function guardarEdicionCerca() {
   if (!Number.isFinite(warnDist) || warnDist < 2 || warnDist > 200) warnDist = c.warn_dist_m || 10;
   c.warn_dist_m = warnDist;
   c.color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
+  const lotePedido = document.getElementById('ec-lote')?.value ?? '__mantener__';
 
   // Guardar en el servidor
   try {
@@ -3204,7 +3270,15 @@ async function guardarEdicionCerca() {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: c.nombre, poligono: c.poligono, categoria: c.categoria,
-        warn_dist_m: c.warn_dist_m, color: c.color
+        warn_dist_m: c.warn_dist_m, color: c.color,
+        // 🆕 2026-08-29: '__mantener__' = no tocar a quien cerca. Cualquier otra
+        //  opcion reescribe las DOS cosas: sin limpiar 'collares', elegir "todo
+        //  el rancho" en una cerca vieja no haria nada — el servidor caeria en su
+        //  lista fija y seguiria cercando solo a los de antes, en silencio.
+        ...(lotePedido === '__mantener__' ? {} : {
+          lote: lotePedido === '' ? null : parseInt(lotePedido),
+          collares: []
+        })
       })
     });
     if (res.ok) {
