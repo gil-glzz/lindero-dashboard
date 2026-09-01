@@ -74,9 +74,20 @@
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
   }
-  .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  /* 🆕 2026-09-01 — LA BARRA DE PESTAÑAS SE DESBORDABA EN SILENCIO.
+     Con flex:1 los botones NO encogen por debajo del ancho de su texto
+     (min-width:auto), asi que la fila crecia mas que la barra y las ultimas
+     pestañas quedaban FUERA de pantalla, sin scroll ni ninguna señal. Medido en
+     produccion: barra 319 px, contenido 436. "Arreo" empezaba en x=310 y
+     "Energia" en x=367 — invisible por completo. Y no era nuevo: Arreo ya venia
+     cortada desde que se agrego; la pestaña de energia solo lo hizo evidente.
+     Con wrap, las pestañas bajan a una segunda fila y se ven todas (medido:
+     scrollWidth 319 = clientWidth, dos filas, las siete dentro). Se prefiere
+     envolver antes que hacer scroll horizontal: una pestaña escondida detras de
+     un scroll que nadie ve es lo mismo que no tenerla. */
+  .sidebar-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
   .sidebar-tab {
-    flex: 1; padding: 12px; background: none; border: none;
+    flex: 1 1 auto; min-width: 0; padding: 11px 9px; background: none; border: none;
     color: var(--text-dim); font-size: 12px; font-weight: 500; cursor: pointer;
     font-family: var(--font-body); letter-spacing: 0.3px;
     border-bottom: 2px solid transparent; transition: all .15s;
@@ -267,7 +278,7 @@
     .map-btn { padding: 9px 13px; font-size: 13px; }
 
     /* Áreas táctiles más grandes en móvil */
-    .sidebar-tab { padding: 14px 8px; font-size: 13px; }
+    .sidebar-tab { padding: 13px 7px; font-size: 13px; }
     .btn { padding: 12px 14px; font-size: 14px; }
     .field input, .field select, .field textarea { padding: 12px; font-size: 16px; }
     /* font-size 16px evita que iOS haga zoom al enfocar un input */
