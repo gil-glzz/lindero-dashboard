@@ -385,6 +385,7 @@
       <button class="sidebar-tab" onclick="showTab('agua')">Agua</button>
       <button class="sidebar-tab" onclick="showTab('infra')">Infra</button>
       <button class="sidebar-tab" onclick="showTab('arreo')">Arreo</button>
+      <button class="sidebar-tab" onclick="showTab('energia')">Energía</button>
     </div>
     <div class="sidebar-content scroll-thin">
 
@@ -596,6 +597,21 @@
         <p id="agua-hint" style="font-size:12px; color:var(--accent); margin-top:10px; display:none; line-height:1.5;">
           Toca el mapa para cada aguaje (puedes marcar varios). Arrastra un 💧 para reubicarlo. Pulsa <b>✓ Listo</b> al terminar.
         </p>
+      </div>
+
+      <!-- ENERGIA: consumo e ingreso solar por collar -->
+      <div id="pane-energia" style="display:none">
+        <p class="sec-title">Energía por collar</p>
+        <div class="field">
+          <label>Ventana</label>
+          <select id="en-horas" onchange="cargarEnergia()">
+            <option value="12">Últimas 12 horas</option>
+            <option value="24">Últimas 24 horas</option>
+            <option value="48" selected>Últimos 2 días</option>
+            <option value="168">Última semana</option>
+          </select>
+        </div>
+        <div id="energia-cuerpo" style="font-size:13px; color:var(--text-dim);">Cargando…</div>
       </div>
 
       <!-- INFRAESTRUCTURA (gateways, antenas, corrales, puertas, saladeros…) -->
@@ -1635,6 +1651,200 @@ function cercaQueAplica(collar, loteId) {
   }) || null;
 }
 
+
+// ════════════════════════════════════════════════════════════
+//  ENERGÍA — consumo e ingreso solar por collar
+//  2026-09-01. Existía el dato y no se veía: el gateway sube tasa y fuente en
+//  cada paquete de salud, pero el servidor los tiraba. Esta vista lee
+//  GET /energia, que ya hace el ajuste de consumo del lado del servidor.
+// ════════════════════════════════════════════════════════════
+// Hues categóricos en ORDEN FIJO por nombre de collar, nunca cíclico ni por
+// ranking: si mañana un collar deja de reportar, los demás no cambian de color.
+// Validados contra la superficie oscura del tablero (banda de luminosidad,
+// croma, separación para daltonismo ΔE 9.3, contraste ≥3:1).
+const EN_HUES = ['#4A90D9', '#D97742', '#12A583', '#9B6FC9'];
+// La fuente es ESTADO, no serie: va en una cinta aparte y siempre con etiqueta,
+// nunca solo por color.
+// LA AUSENCIA DE INGRESO NO LLEVA COLOR. El primer intento le puso un gris a
+// "bateria" y el validador lo tumbo: contra el azul del USB daba ΔE 10.6 a
+// vision normal, por debajo del piso de 15 — dos estados que el ojo no separa.
+// Meter un gris mas claro solo empeoraba el croma. La solucion no era otro
+// color: es que "a bateria" signifique SIN TINTA, que ademas es lo que dice.
+// Asi solo hay dos colores que separar, y separan con ΔE 25.5.
+// El texto siempre lleva tokens de texto; el color solo lo carga la muestra.
+const EN_FUENTE = {
+  1: { c: '#BE8420', t: 'panel'   },
+  2: { c: '#6C8FE0', t: 'USB'     },
+  0: { c: null,      t: 'batería' },
+};
+
+function enFmtHora(ms) {
+  const d = new Date(ms);
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+function enFmtDia(ms) {
+  return new Date(ms).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+
+async function cargarEnergia() {
+  const cont = document.getElementById('energia-cuerpo');
+  if (!cont) return;
+  const horas = parseInt(document.getElementById('en-horas')?.value) || 48;
+  cont.innerHTML = 'Cargando…';
+  let data;
+  try {
+    const res = await authFetch(`${API_BASE}/energia?horas=${horas}`);
+    if (!res.ok) { cont.innerHTML = 'No se pudo leer la energía (HTTP ' + res.status + ').'; return; }
+    data = await res.json();
+  } catch (e) { cont.innerHTML = 'Sin conexión con el servidor.'; return; }
+
+  const devs = Object.keys(data.collares || {}).sort();
+  if (!devs.length) { cont.innerHTML = 'Todavía no hay datos de energía en esta ventana.'; return; }
+
+  // Una sola serie de VOLTAJE por collar: los milivolts del paquete de salud
+  // (uno cada 15 min, histórico) más los de la posición (uno por minuto, desde
+  // que el gateway los reenvía). Mismo dato y misma unidad, así que un solo eje.
+  // El % no se grafica: no tiene cota de exactitud garantizada en la hoja de datos.
+  const series = {};
+  devs.forEach(d => {
+    const c = data.collares[d];
+    const pts = []
+      .concat((c.salud || []).map(r => ({ t: +new Date(r.t), mv: r.mv })))
+      .concat((c.pos   || []).map(r => ({ t: +new Date(r.t), mv: r.mv })))
+      .filter(p => p.mv != null && p.mv > 2000 && p.mv < 5000)
+      .sort((a, b) => a.t - b.t);
+    series[d] = pts;
+  });
+  const conDatos = devs.filter(d => series[d].length >= 2);
+
+  let html = '';
+
+  // ── Titulares: lo primero que se lee ──────────────────────────────────
+  html += '<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">';
+  devs.forEach((d, i) => {
+    const r = (data.collares[d].resumen) || {};
+    const col = EN_HUES[i % EN_HUES.length];
+    const cons = r.consumo;
+    const ult = r.ultima || {};
+    const fu = EN_FUENTE[ult.fuente] || null;
+    // El gasto se lee del ajuste a batería. Sin muestras a batería no hay número
+    // y hay que decirlo, no rellenarlo con la tasa de un collar enchufado.
+    const gasto = cons
+      ? `<span style="font-family:var(--font-display); font-size:20px; font-weight:700; font-variant-numeric:tabular-nums;">${cons.mv_por_hora.toFixed(1)}</span>
+         <span style="color:var(--text-dim); font-size:12px;">mV/h · ${cons.horas} h · ${cons.muestras} pts</span>`
+      : `<span style="color:var(--text-dim); font-size:12px;">sin muestras a batería en esta ventana</span>`;
+    html += `<div style="background:var(--panel-2); border:1px solid var(--border); border-left:3px solid ${col}; padding:10px 12px;">
+      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <strong style="color:var(--text);">${esc(d)}</strong>
+        ${fu ? `<span style="font-size:11px; color:var(--text-dim);">${fu.c ? `<span style="color:${fu.c};">●</span>` : '○'} ${fu.t}</span>` : ''}
+        <span style="margin-left:auto; font-family:var(--font-display); font-variant-numeric:tabular-nums; color:var(--text);">
+          ${ult.mv ? (ult.mv/1000).toFixed(3) + ' V' : '—'}</span>
+      </div>
+      <div>${gasto}</div>
+      ${r.fuente_vistas ? `<div style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+        panel ${r.fuente_vistas.panel} · USB ${r.fuente_vistas.usb} · batería ${r.fuente_vistas.nada}
+        ${r.fuente_vistas.sin_dato ? ' · sin dato ' + r.fuente_vistas.sin_dato : ''}</div>` : ''}
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── La gráfica ────────────────────────────────────────────────────────
+  if (conDatos.length) {
+    const W = 288, H = 132, ML = 34, MR = 6, MT = 8, MB = 18;
+    const todos = conDatos.flatMap(d => series[d]);
+    const t0 = Math.min(...todos.map(p => p.t)), t1 = Math.max(...todos.map(p => p.t));
+    let v0 = Math.min(...todos.map(p => p.mv)), v1 = Math.max(...todos.map(p => p.mv));
+    const pad = Math.max(30, (v1 - v0) * 0.12); v0 -= pad; v1 += pad;
+    const X = t => ML + (t1 === t0 ? 0 : (t - t0) / (t1 - t0)) * (W - ML - MR);
+    const Y = v => MT + (1 - (v - v0) / (v1 - v0)) * (H - MT - MB);
+
+    let g = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block; overflow:visible;" role="img" aria-label="Voltaje de batería por collar">`;
+    // Rejilla recesiva, cuatro niveles
+    for (let k = 0; k <= 3; k++) {
+      const v = v0 + (v1 - v0) * k / 3, y = Y(v);
+      g += `<line x1="${ML}" y1="${y.toFixed(1)}" x2="${W-MR}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`;
+      g += `<text x="${ML-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)" style="font-variant-numeric:tabular-nums;">${(v/1000).toFixed(2)}</text>`;
+    }
+    g += `<text x="${ML}" y="${H-5}" font-size="9" fill="var(--text-dim)">${enFmtDia(t0)} ${enFmtHora(t0)}</text>`;
+    g += `<text x="${W-MR}" y="${H-5}" text-anchor="end" font-size="9" fill="var(--text-dim)">${enFmtHora(t1)}</text>`;
+    conDatos.forEach(d => {
+      const col = EN_HUES[devs.indexOf(d) % EN_HUES.length];
+      const dpath = series[d].map((p, k) => (k ? 'L' : 'M') + X(p.t).toFixed(1) + ' ' + Y(p.mv).toFixed(1)).join(' ');
+      g += `<path d="${dpath}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    });
+    g += '</svg>';
+    html += `<div style="background:var(--panel-2); border:1px solid var(--border); padding:10px 8px 4px;">
+      <div style="font-size:11px; color:var(--text-dim); margin:0 0 6px 4px;">Voltaje de celda · V</div>${g}`;
+
+    // ── Cinta de fuente: estado, no serie. Una fila por collar. ─────────
+    conDatos.forEach(d => {
+      const sal = (data.collares[d].salud || []).filter(r => r.fuente != null);
+      if (!sal.length) return;
+      // Un liston de estado son TRAMOS, no puntos: hay que unir las muestras
+      // consecutivas que comparten fuente ANTES de dibujar. Sin esto, con cubos
+      // de 5 min sobre 48 h cada muestra mide menos de 1 px, el separador de
+      // 2 px se la come entera y la cinta sale punteada — pareciendo que la
+      // fuente parpadeo cuando en realidad estuvo estable todo el dia.
+      const tramos = [];
+      sal.forEach((r, k) => {
+        const t = +new Date(r.t);
+        const tf = k + 1 < sal.length ? +new Date(sal[k+1].t) : t1;
+        const ult = tramos[tramos.length - 1];
+        if (ult && ult.fuente === r.fuente) ult.hasta = tf;
+        else tramos.push({ fuente: r.fuente, desde: t, hasta: tf });
+      });
+      let cinta = `<svg viewBox="0 0 ${W} 12" width="100%" style="display:block;" role="img" aria-label="Fuente de energía de ${d}">`;
+      tramos.forEach(tr => {
+        const x = X(tr.desde), xf = X(tr.hasta);
+        const f = EN_FUENTE[tr.fuente] || EN_FUENTE[0];
+        const w = Math.max(1, xf - x - 2);   // 2 px de separación ENTRE TRAMOS
+        cinta += f.c
+          // Con ingreso: bloque lleno.
+          ? `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="8" fill="${f.c}"/>`
+          // Sin ingreso: una linea base visible. Tiene que leerse, porque es lo
+          // que distingue "a bateria" —medido, cero entrada— de un HUECO sin
+          // dato, que no pinta nada. Una fila en blanco seria ambigua.
+          : `<rect x="${x.toFixed(1)}" y="8" width="${w.toFixed(1)}" height="2" fill="#4A5A4C"/>`;
+      });
+      cinta += '</svg>';
+      html += `<div style="margin-top:6px;"><div style="font-size:10px; color:var(--text-dim); margin-left:4px;">${esc(d)} · fuente</div>${cinta}</div>`;
+    });
+    html += '</div>';
+
+    // Leyenda: siempre presente con dos o más series, nunca color solo
+    html += '<div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:11px; color:var(--text-dim);">';
+    conDatos.forEach(d => {
+      const col = EN_HUES[devs.indexOf(d) % EN_HUES.length];
+      html += `<span><span style="display:inline-block; width:10px; height:2px; background:${col}; vertical-align:middle;"></span> ${esc(d)}</span>`;
+    });
+    [1,2,0].forEach(k => {
+      const f = EN_FUENTE[k];
+      html += `<span><span style="display:inline-block; width:8px; height:8px; vertical-align:-1px; ${
+        f.c ? `background:${f.c};` : 'border:1px solid var(--text-dim);'}"></span> ${f.t}</span>`;
+    });
+    html += '</div>';
+  }
+
+  // ── Tabla: el mismo dato en texto, para no depender de la gráfica ─────
+  html += '<details style="margin-top:12px;"><summary style="cursor:pointer; font-size:12px; color:var(--text-dim);">Ver los números</summary>';
+  html += '<table style="width:100%; font-size:11px; margin-top:8px; border-collapse:collapse; font-variant-numeric:tabular-nums;">';
+  html += '<tr style="color:var(--text-dim);"><th style="text-align:left;">collar</th><th style="text-align:right;">gasto</th><th style="text-align:right;">carga neta</th><th style="text-align:right;">pts</th></tr>';
+  devs.forEach(d => {
+    const r = data.collares[d].resumen || {};
+    html += `<tr><td>${esc(d)}</td>
+      <td style="text-align:right;">${r.consumo ? r.consumo.mv_por_hora.toFixed(1) + ' mV/h' : '—'}</td>
+      <td style="text-align:right;">${r.carga_neta ? r.carga_neta.mv_por_hora.toFixed(1) + ' mV/h' : '—'}</td>
+      <td style="text-align:right;">${(r.muestras && r.muestras.total) || 0}</td></tr>`;
+  });
+  html += '</table>';
+  html += '<p style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5;">'
+       +  'El <strong>gasto</strong> se ajusta solo con las muestras a batería. Con una fuente '
+       +  'conectada el cargador empuja corriente y la tasa mediría la suma, no el gasto.</p>';
+  html += '</details>';
+
+  cont.innerHTML = html;
+}
+
 // ════════════════════════════════════════════════════════════
 //  ANIMALES
 // ════════════════════════════════════════════════════════════
@@ -2068,7 +2278,7 @@ function showTab(t) {
   // en todos los casos: los flujos de dibujo/edición crean sus capas DESPUÉS de mostrar
   // el panel, y guardarCercaActual lee currentPolyPts ANTES de llamar a showTab.
   cancelarModosMapa();
-  ['lotes','nuevolote','cerca','cercas','editcerca','animales','agua','infra','arreo'].forEach(p => {
+  ['lotes','nuevolote','cerca','cercas','editcerca','animales','agua','infra','arreo','energia'].forEach(p => {
     const el = document.getElementById('pane-'+p);
     if (el) el.style.display = (p===t) ? 'block' : 'none';
   });
@@ -2079,7 +2289,8 @@ function showTab(t) {
     animales: 2,
     agua: 3,
     infra: 4,
-    arreo: 5
+    arreo: 5,
+    energia: 6
   };
   if (tabMap[t] !== undefined) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
@@ -2089,6 +2300,7 @@ function showTab(t) {
   if (t === 'agua') renderAguajes();
   if (t === 'infra') cargarInstalaciones();
   if (t === 'arreo') cargarArreo();
+  if (t === 'energia') cargarEnergia();
 }
 
 // Zonas (2026-07-24): la categoría es semántica; al elegirla se sugiere el TIPO de
