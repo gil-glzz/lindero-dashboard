@@ -21,7 +21,7 @@
 //                    el script de sincronizacion le pega ademas el SHA del
 //                    maestro a este VER, en la copia que sube — asi cada
 //                    commit invalida la cache aunque nadie se acuerde.
-const VER = 'lindero-v8-11b5c66';
+const VER = 'lindero-v8-b07483e';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
