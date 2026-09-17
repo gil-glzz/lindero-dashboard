@@ -1457,7 +1457,50 @@ function cancelarNuevaCerca() {
   showTab('cercas');
 }
 
+// ─────────────────────────────────────────────────────────────
+//  🆕 2026-09-17 — LIMITE DE VERTICES, CALCULADO NO SUPUESTO
+//  Gilberto: "como limite hagamos que en el dashboard no puedas poner mas
+//  que el limite". Un numero fijo mentiria: un potrero grande gasta mas
+//  bytes por vertice que uno chico, porque los desplazamientos llevan mas
+//  digitos. Asi que aqui se ESPEJA el armado real del gateway
+//  (Gateway_V7.ino, rama "cerca enviada") y se mide el marco de verdad.
+//  Si esto y el gateway se separan, el ranchero dibuja cercas que el collar
+//  rechaza: cualquier cambio alla se copia aca.
+// ─────────────────────────────────────────────────────────────
+const CERCA_MAX_CLARO = 235;   // CRIPTO_MAX_CLARO del enlace sellado
+const CERCA_DECIMALES = 6;     // campo "e" de la bajada
+function medirCercaEnElAire(poligono, warnDist) {
+  if (!poligono || poligono.length < 3) return { bytes: 0, cabe: true, maximo: 0 };
+  const f = Math.pow(10, CERCA_DECIMALES);
+  const bl = Math.round(poligono[0].lat * f), bn = Math.round(poligono[0].lng * f);
+  // Nombre de collar generoso y los 7 B del desbloqueo, para no prometer de mas.
+  const cabeza = ('{"d":"collar_0000","wd":' + Math.round(warnDist || 10) +
+                  ',"ex":0,"ar":0,"np":' + poligono.length + ',"e":' + CERCA_DECIMALES +
+                  ',"b":[' + bl + ',' + bn + '],"o":[').length;
+  const vs = poligono.map(p => '[' + (Math.round(p.lat * f) - bl) + ',' +
+                                     (Math.round(p.lng * f) - bn) + ']');
+  const reserva = 2 + 7;   // "]}"  y  ,"db":1
+  let acc = cabeza, maximo = 0;
+  for (let i = 0; i < vs.length; i++) {
+    const add = vs[i].length + (i > 0 ? 1 : 0);
+    if (acc + add + reserva > CERCA_MAX_CLARO) break;
+    acc += add; maximo++;
+  }
+  return { bytes: cabeza + vs.join(',').length + reserva, cabe: maximo >= poligono.length, maximo };
+}
+function cercaCabeOAvisa(poligono, warnDist, nombre) {
+  const m = medirCercaEnElAire(poligono, warnDist);
+  if (m.cabe) return true;
+  alert('⚠ La cerca' + (nombre ? ' "' + nombre + '"' : '') + ' no cabe en un mensaje de radio.\n\n' +
+        'Tiene ' + poligono.length + ' esquinas y ocupa ' + m.bytes + ' bytes; el maximo es ' +
+        CERCA_MAX_CLARO + '.\nCon un potrero de este tamano caben ' + m.maximo + '.\n\n' +
+        'Quitale ' + (poligono.length - m.maximo) + ' esquina(s) o parte el potrero en dos cercas.\n' +
+        'Si se guardara asi, el collar la rechazaria y seguiria con la cerca anterior.');
+  return false;
+}
+
 async function enviarCercaAlServidor(cerca) {
+  if (!cercaCabeOAvisa(cerca.poligono, cerca.warn_dist_m, cerca.nombre)) return;
   const payload = {
     nombre: cerca.nombre, tipo: cerca.tipo, categoria: cerca.categoria || 'potrero',
     poligono: cerca.poligono, warn_dist_m: cerca.warn_dist_m,
@@ -3289,6 +3332,12 @@ async function guardarEdicionCerca() {
   c.color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
   const lotePedido = document.getElementById('ec-lote')?.value ?? '__mantener__';
 
+  // 🆕 2026-09-17: editar tambien puede pasarse del marco — mover un vertice lejos
+  //  agranda los desplazamientos y con ellos los bytes, aunque no cambie el numero
+  //  de esquinas. Se mide DESPUES de capturar la forma y con la banda de aviso ya
+  //  resuelta, que es lo que de verdad viajara.
+  if (!cercaCabeOAvisa(c.poligono, c.warn_dist_m, c.nombre)) return;
+
   // Guardar en el servidor
   try {
     const res = await authFetch(`${API_BASE}/geovallas/${c.id}`, {
@@ -3329,6 +3378,7 @@ async function duplicarCerca() {
   const lats = c.poligono.map(p => p.lat);
   const alto = (Math.max(...lats) - Math.min(...lats)) || 0.001;
   const poligono = c.poligono.map(p => ({ lat: p.lat - alto * 1.15, lng: p.lng }));
+  if (!cercaCabeOAvisa(poligono, c.warn_dist_m, (c.nombre || 'Cerca') + ' (copia)')) return;
   const payload = {
     nombre: (c.nombre || 'Cerca') + ' (copia)',
     tipo: c.tipo || 'permanente',
