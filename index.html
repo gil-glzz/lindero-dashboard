@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self'; manifest-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://cdnjs.cloudflare.com https://server.arcgisonline.com https://*.google.com https://tile.openstreetmap.org https://*.openstreetmap.org; connect-src 'self' https://collar-gps-server.onrender.com; object-src 'none'; base-uri 'self'">
 <title>Lindero — Panel de cercas digitales</title>
 <meta name="theme-color" content="#0d1410">
@@ -11,10 +11,11 @@
 // el verde antes de cambiar a café o arena. La preferencia es del ranchero (localStorage).
 (function(){ try {
   var t = localStorage.getItem('lindero_tema');
-  if (t === 'cafe' || t === 'arena') {
+  var colores = { cafe: '#1c140e', arena: '#efe6d2', relieve: '#071a0d' };
+  if (colores[t]) {
     document.documentElement.setAttribute('data-tema', t);
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', t === 'cafe' ? '#1c140e' : '#efe6d2');
+    if (m) m.setAttribute('content', colores[t]);
   }
 } catch(e) {} })();
 </script>
@@ -45,6 +46,9 @@
     /* Curvas de nivel café desértico (del logo) para la barra y el riel: un mosaico SVG de
        320x200 que repite sin costura. Café y arena traen el suyo; verde va liso por ahora. */
     --topo: none;   /* verde: sin curvas por ahora, un solo color (Gilberto, 2026-09-18); café y arena sí las llevan */
+    --topo-riel: var(--topo);   /* el riel de secciones sigue a la barra, salvo que un tema diga otra cosa */
+    --topo-panel: none;         /* el panel lateral entero (solo el tema relieve lo textura) */
+    --topo-tam: 320px 200px;    /* tamaño del mosaico; un tema con degradado añade su capa */
     --logo-glifo: #f6fbef;   /* el toro del logo, en blanco (el mismo blanco del logo original) */
     /* Semáforo de los animales (texto). En arena se oscurecen para leerse sobre claro. */
     --ok: #4ade80; --aviso: #fbbf24;
@@ -53,7 +57,7 @@
     --gris-buscando: #9ca3af; --gris-sin: #6b7280;    /* estados de conexión del collar */
   }
   /* ── Temas (2026-09-18) ── El ranchero elige bajo «Salir»: verde (el de siempre),
-     café desértico o arena. Vive en localStorage (lindero_tema) y llega como data-tema
+     café desértico, arena o relieve verde. Vive en localStorage (lindero_tema) y llega como data-tema
      en <html> antes del primer pintado (script en <head>). Los colores del mapa
      (polígonos, marcadores) no cambian: son datos, no decoración. */
   :root[data-tema="cafe"] {
@@ -63,6 +67,19 @@
     --ok-tinte: #8fd18a22; --aviso-tinte: #f5c45122; --danger-tinte: #f08c7d22;
     --topo: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27320%27 height=%27200%27 viewBox=%270 0 320 200%27%3E%3Cg fill=%27none%27 stroke=%27%23c9a97a%27 stroke-opacity=%270.24%27 stroke-width=%271%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M0 23.7 L8 25.3 L16 26.7 L24 27.7 L32 28.4 L40 28.7 L48 28.7 L56 28.4 L64 27.8 L72 27.1 L80 26.3 L88 25.5 L96 24.9 L104 24.3 L112 24.0 L120 23.8 L128 23.7 L136 23.7 L144 23.8 L152 23.8 L160 23.7 L168 23.4 L176 23.0 L184 22.3 L192 21.4 L200 20.2 L208 19.0 L216 17.7 L224 16.4 L232 15.2 L240 14.3 L248 13.7 L256 13.5 L264 13.7 L272 14.3 L280 15.3 L288 16.6 L296 18.3 L304 20.1 L312 21.9 L320 23.7%27/%3E%3Cpath d=%27M0 65.8 L8 66.0 L16 65.7 L24 64.9 L32 64.3 L40 64.1 L48 64.5 L56 65.6 L64 67.3 L72 69.3 L80 71.3 L88 72.8 L96 73.4 L104 73.1 L112 71.7 L120 69.4 L128 66.6 L136 63.8 L144 61.2 L152 59.3 L160 58.2 L168 58.0 L176 58.3 L184 59.1 L192 59.7 L200 59.9 L208 59.5 L216 58.4 L224 56.7 L232 54.7 L240 52.7 L248 51.2 L256 50.6 L264 50.9 L272 52.3 L280 54.6 L288 57.4 L296 60.2 L304 62.8 L312 64.7 L320 65.8%27/%3E%3Cpath d=%27M0 104.1 L8 104.3 L16 104.5 L24 104.8 L32 105.3 L40 106.0 L48 106.8 L56 107.7 L64 108.8 L72 109.9 L80 110.9 L88 111.7 L96 112.3 L104 112.6 L112 112.5 L120 111.9 L128 111.0 L136 109.7 L144 108.0 L152 106.1 L160 104.1 L168 102.1 L176 100.2 L184 98.5 L192 97.1 L200 96.1 L208 95.4 L216 95.3 L224 95.5 L232 96.0 L240 96.9 L248 97.9 L256 99.0 L264 100.1 L272 101.1 L280 102.0 L288 102.8 L296 103.3 L304 103.7 L312 103.9 L320 104.1%27/%3E%3Cpath d=%27M0 142.2 L8 143.5 L16 145.5 L24 148.3 L32 151.3 L40 154.2 L48 156.5 L56 158.0 L64 158.4 L72 157.7 L80 156.2 L88 154.3 L96 152.2 L104 150.5 L112 149.3 L120 148.8 L128 148.9 L136 149.5 L144 150.0 L152 150.2 L160 149.8 L168 148.5 L176 146.5 L184 143.7 L192 140.7 L200 137.8 L208 135.5 L216 134.0 L224 133.6 L232 134.3 L240 135.8 L248 137.7 L256 139.8 L264 141.5 L272 142.7 L280 143.2 L288 143.1 L296 142.5 L304 142.0 L312 141.8 L320 142.2%27/%3E%3Cpath d=%27M0 181.9 L8 183.6 L16 185.4 L24 187.2 L32 188.9 L40 190.4 L48 191.5 L56 192.3 L64 192.7 L72 192.6 L80 192.1 L88 191.3 L96 190.2 L104 188.9 L112 187.5 L120 186.1 L128 184.9 L136 183.8 L144 182.9 L152 182.3 L160 181.9 L168 181.7 L176 181.7 L184 181.8 L192 181.8 L200 181.9 L208 181.8 L216 181.6 L224 181.3 L232 180.7 L240 180.1 L248 179.4 L256 178.8 L264 178.2 L272 177.8 L280 177.6 L288 177.8 L296 178.3 L304 179.2 L312 180.4 L320 181.9%27/%3E%3Cpath d=%27M264.5 84.0 L267.1 88.7 L263.3 93.1 L254.6 95.6 L245.7 96.8 L238.0 98.1 L230.0 99.2 L221.4 99.1 L213.1 97.8 L204.9 95.8 L197.4 92.9 L194.0 88.5 L196.5 84.0 L201.5 80.4 L204.4 77.1 L206.5 73.0 L211.7 69.1 L220.4 67.1 L230.0 67.2 L239.0 68.2 L247.1 70.1 L253.0 73.2 L256.3 76.9 L259.7 80.3Z%27/%3E%3Cpath d=%27M250.3 84.0 L251.8 86.6 L249.6 89.1 L244.5 90.5 L239.2 91.2 L234.7 91.9 L230.0 92.6 L224.9 92.5 L220.0 91.8 L215.2 90.6 L210.8 89.0 L208.8 86.6 L210.3 84.0 L213.2 82.0 L215.0 80.1 L216.2 77.8 L219.2 75.6 L224.4 74.5 L230.0 74.6 L235.3 75.1 L240.0 76.2 L243.5 77.9 L245.5 80.0 L247.5 81.9Z%27/%3E%3Cpath d=%27M97.3 130.0 L94.8 133.1 L91.8 135.8 L87.3 138.0 L81.7 139.3 L76.1 140.6 L70.0 142.4 L62.2 143.4 L55.0 142.0 L51.3 138.6 L50.2 135.3 L48.2 132.7 L45.3 130.0 L44.6 126.9 L46.8 123.8 L50.5 121.0 L55.7 118.5 L62.7 117.4 L70.0 118.4 L75.7 120.2 L81.0 121.2 L88.1 121.6 L95.2 123.3 L98.4 126.5Z%27/%3E%3Cpath d=%27M83.7 130.0 L82.4 131.5 L80.9 132.9 L78.7 134.0 L75.8 134.7 L73.1 135.3 L70.0 136.2 L66.1 136.7 L62.5 136.0 L60.7 134.3 L60.1 132.6 L59.1 131.3 L57.7 130.0 L57.3 128.4 L58.4 126.9 L60.3 125.5 L62.8 124.3 L66.3 123.7 L70.0 124.2 L72.8 125.1 L75.5 125.6 L79.1 125.8 L82.6 126.6 L84.2 128.2Z%27/%3E%3C/g%3E%3C/svg%3E");
   }
+  /* Relieve (D, 2026-09-18): verde oliva profundo con curvas de nivel, la textura que eligió
+     Gilberto (fondo-relieve.webp) sobre la barra y todo el panel lateral. Solo cambia el
+     fondo: toro, textos, acentos y pestañas son los del tema verde. */
+  :root[data-tema="relieve"] {
+    --bg: #182311; --panel: #182311; --panel-2: rgba(20, 38, 18, .62); --border: #3a4d2c;
+    --text: #edf1e4; --text-dim: #aebb9a;
+    --topo: none; --topo-panel: none;   /* aquí la textura es la imagen, no el SVG */
+  }
+  /* La textura de relieve es UNA imagen (fondo-relieve.webp, la que eligió Gilberto) puesta
+     en el body a pantalla completa; barra y panel van transparentes para que corra continua
+     por los dos. En móvil el panel flota sobre el mapa, así que ahí lleva la imagen él mismo. */
+  :root[data-tema="relieve"] body { background-image: url("fondo-relieve.webp"); background-size: cover; background-position: center; }
+  :root[data-tema="relieve"] header, :root[data-tema="relieve"] .sidebar { background-color: transparent; }
   :root[data-tema="arena"] {
     --bg: #efe6d2; --panel: #e9dcc3; --panel-2: #dfd0b2; --border: #c9b895;
     --text: #2b1f14; --text-dim: #7a5f3f; --accent: #2f7d3a; --accent-dim: #a9c9a4;
@@ -77,7 +94,13 @@
     font-family: var(--font-body);
     background: var(--bg);
     color: var(--text);
+    /* Alto = pantalla VISIBLE. En Safari de iPhone 100vh incluye la franja que tapa su
+       barra de direcciones, así que la barra de secciones quedaba debajo de ella y no se
+       podía tocar (Gilberto, 2026-09-18). 100dvh sigue a la barra al aparecer y esconderse;
+       -webkit-fill-available es el respaldo para iOS viejo; 100vh para lo demás. */
     height: 100vh;
+    height: -webkit-fill-available;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -87,7 +110,7 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 20px;
     background-color: var(--panel);
-    background-image: var(--topo); background-size: 320px 200px;
+    background-image: var(--topo); background-size: var(--topo-tam);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
@@ -118,6 +141,7 @@
   .tema-opc[data-tema="verde"] { background: linear-gradient(135deg, #4ade80 50%, #141d16 50%); }
   .tema-opc[data-tema="cafe"]  { background: linear-gradient(135deg, #c9a97a 50%, #2a1f16 50%); }
   .tema-opc[data-tema="arena"] { background: linear-gradient(135deg, #e9dcc3 50%, #8a6a45 50%); }
+  .tema-opc[data-tema="relieve"] { background: linear-gradient(135deg, #8ef0ae 50%, #0c2314 50%); }
   .salto { display: none; }  /* solo existe en móvil: parte el encabezado en dos filas */
   .logo h1 {
     font-family: var(--font-display); font-size: 19px; font-weight: 500;
@@ -132,7 +156,8 @@
   /* ── Layout ── */
   .main { flex: 1; display: flex; overflow: hidden; }
   .sidebar {
-    width: 320px; background: var(--panel);
+    width: 320px; background-color: var(--panel);
+    background-image: var(--topo-panel); background-size: var(--topo-tam);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
   }
@@ -152,7 +177,7 @@
   .sidebar-tabs {
     display: flex; flex-direction: column; width: 62px; flex-shrink: 0;
     border-right: 1px solid var(--border); overflow-y: auto;
-    background-image: var(--topo); background-size: 320px 200px;
+    background-image: var(--topo-riel); background-size: var(--topo-tam);
   }
   .sidebar-tab {
     flex: 0 0 auto; padding: 15px 3px 14px; background: none; border: none;
@@ -314,7 +339,7 @@
     .sidebar {
       position: absolute;
       left: 0; right: 0; bottom: 0;
-      width: 100%; height: auto; max-height: 80vh;
+      width: 100%; height: auto; max-height: 80vh; max-height: 80dvh;
       border-right: none;
       border-top: 1px solid var(--border);
       border-radius: 16px 16px 0 0;
@@ -330,6 +355,11 @@
       padding-bottom: env(safe-area-inset-bottom, 0px);
       background-color: var(--panel);
     }
+    :root[data-tema="relieve"] .sidebar-tabs { background-color: transparent; }
+    :root[data-tema="relieve"] .sidebar {
+      background-color: var(--bg); background-image: url("fondo-relieve.webp");
+      background-size: cover; background-position: center bottom;
+    }
     .sidebar-tab {
       flex: 1 1 0; min-width: 0; padding: 13px 2px 12px; font-size: 11.5px;
       border-left: none; border-top: 2px solid transparent; white-space: nowrap;
@@ -343,7 +373,7 @@
     /* visibility:hidden saca el contenido recogido del tabulador y del lector de pantalla
        (con max-height:0 solo, Enter sobre un botón invisible abría formularios). */
     .sidebar.abierto .sidebar-content {
-      max-height: calc(70vh - 48px); padding: 16px; overflow-y: auto;
+      max-height: calc(70vh - 48px); max-height: calc(70dvh - 48px); padding: 16px; overflow-y: auto;
       visibility: visible; transition-delay: 0s;
     }
 
@@ -501,6 +531,7 @@
         <button class="tema-opc activo" role="radio" aria-checked="true" data-tema="verde" title="Tema verde (A)" aria-label="Tema verde" onclick="ponerTema('verde')"></button>
         <button class="tema-opc" role="radio" aria-checked="false" data-tema="cafe" title="Tema café desértico (B)" aria-label="Tema café desértico" onclick="ponerTema('cafe')"></button>
         <button class="tema-opc" role="radio" aria-checked="false" data-tema="arena" title="Tema arena (C)" aria-label="Tema arena" onclick="ponerTema('arena')"></button>
+        <button class="tema-opc" role="radio" aria-checked="false" data-tema="relieve" title="Tema relieve verde (D)" aria-label="Tema relieve verde" onclick="ponerTema('relieve')"></button>
       </div>
     </div>
     <span class="salto" aria-hidden="true"></span>
@@ -967,7 +998,7 @@ function cerrarSesion() {
 // Tres paletas: verde (la de siempre), cafe (café desértico) y arena. La elección es
 // del ranchero, vive en localStorage y NO se borra al cerrar sesión: es gusto, no
 // credencial. El <head> la aplica antes del primer pintado; aquí solo se cambia.
-const TEMAS = { verde: '#0d1410', cafe: '#1c140e', arena: '#efe6d2' };  // color de la barra del sistema
+const TEMAS = { verde: '#0d1410', cafe: '#1c140e', arena: '#efe6d2', relieve: '#071a0d' };  // color de la barra del sistema
 function temaActual() {
   const t = document.documentElement.getAttribute('data-tema');
   return TEMAS[t] ? t : 'verde';
