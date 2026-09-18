@@ -2289,7 +2289,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 // Al volver la señal: refrescar de inmediato (no esperar el próximo polling).
 window.addEventListener('online', () => { mostrarBannerConexion(true); if (authToken) actualizarDesdeServidor(); });
-window.addEventListener('offline', () => mostrarBannerConexion(false));
+window.addEventListener('offline', () => mostrarBannerConexion(false, 'internet'));
 
 // Collares que SÍ están reportando pero no tienen animal registrado con ese ID.
 // Se dibuja una barra ámbar arriba, distinta de la roja de "sin conexión", y se
@@ -2317,20 +2317,52 @@ function mostrarBannerHuerfanos(lista) {
   b.style.display = 'block';
 }
 
-function mostrarBannerConexion(ok) {
+// ── Punto 10 (2026-09-18): aviso «sin conexión» honesto ─────────────────────────────
+//  El tablero sigue mostrando las últimas posiciones cuando se cae internet o el servidor; sin
+//  aviso, parecen actuales. Reglas: (a) el servidor tiene que fallar DOS sondeos seguidos (~10 s)
+//  antes de avisar — un hipo aislado no parpadea; (b) sin internet en el dispositivo se avisa de
+//  inmediato y se dice que es el dispositivo, no el servidor; (c) un 401/403 no es «sin conexión»
+//  (es sesión vencida: authFetch ya manda al login); (d) el tiempo desde el último dato corre cada
+//  segundo; (e) la banda va EN FLUJO antes del <header>, empuja la pantalla en vez de tapar el logo.
+let conexionFallos = 0, conexionTicker = null;
+function tiempoDesde(t) {
+  if (!t) return null;
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  return `hace ${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
+}
+function textoBannerConexion(sinInternet) {
+  const d = tiempoDesde(window._ultimoRefrescoOk);
+  return (sinInternet ? '📵 Sin internet en este dispositivo' : '⚠ El servidor no responde')
+       + (d ? ` · última actualización ${d}` : ' · mostrando datos guardados')
+       + ' — las posiciones que ves pueden no ser actuales';
+}
+function mostrarBannerConexion(ok, motivo) {
   let b = document.getElementById('banner-conexion');
-  if (ok) { if (b) b.style.display = 'none'; return; }
+  if (ok) {
+    conexionFallos = 0;
+    if (conexionTicker) { clearInterval(conexionTicker); conexionTicker = null; }
+    if (b) b.style.display = 'none';
+    return;
+  }
+  const sinInternet = motivo === 'internet' || navigator.onLine === false;
+  if (!sinInternet) { conexionFallos++; if (conexionFallos < 2) return; }   // histéresis: 2 sondeos
   if (!b) {
     b = document.createElement('div');
     b.id = 'banner-conexion';
-    b.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#7f1d1d; color:#fecaca; text-align:center; padding:6px 10px; font-size:12px; z-index:3000;';
-    document.body.appendChild(b);
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'display:none; flex-shrink:0; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; '
+      + 'background:#7f1d1d; color:#fecaca; padding:7px 12px; font-size:12.5px; line-height:1.3; border-bottom:1px solid #991b1b;';
+    b.innerHTML = '<span id="banner-conexion-txt"></span>'
+      + '<button onclick="conexionFallos=2; actualizarDesdeServidor();" style="background:transparent; color:#fecaca; border:1px solid #fca5a5; border-radius:6px; padding:3px 10px; font-size:12px; cursor:pointer;">Reintentar</button>';
+    const header = document.querySelector('header');
+    if (header && header.parentNode) header.parentNode.insertBefore(b, header); else document.body.prepend(b);
   }
-  const t = window._ultimoRefrescoOk;
-  const min = t ? Math.floor((Date.now() - t) / 60000) : null;
-  b.textContent = '⚠ Sin conexión con el servidor' +
-    (min != null ? ` — datos de hace ${min} min` : ' — mostrando datos guardados');
-  b.style.display = 'block';
+  const pinta = () => { const t = document.getElementById('banner-conexion-txt'); if (t) t.textContent = textoBannerConexion(sinInternet); };
+  pinta();
+  if (!conexionTicker) conexionTicker = setInterval(pinta, 1000);
+  b.style.display = 'flex';
 }
 
 async function actualizarDesdeServidor() {
@@ -2414,7 +2446,7 @@ async function actualizarDesdeServidor() {
       window._ultimoRefrescoOk = Date.now();
       mostrarBannerConexion(true);
       mostrarBannerHuerfanos(huerfanos);
-    } else { mostrarBannerConexion(false); }
+    } else if (res.status !== 401 && res.status !== 403) { mostrarBannerConexion(false); }   // 401/403 = sesión, no red
   } catch(e) { mostrarBannerConexion(false); }
 
   // 2. Cercas guardadas en el servidor
