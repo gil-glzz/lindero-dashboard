@@ -23,7 +23,7 @@
 //                    commit invalida la cache aunque nadie se acuerde.
 //   v9 (2026-09-18): toro del logo en la barra (SVG en linea), temas verde/cafe/arena,
 //                    pestañas sin emojis y barra inferior en movil.
-const VER = 'lindero-v9-675af46';
+const VER = 'lindero-v9-00663ec';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
@@ -33,7 +33,7 @@ const API_HOST = 'collar-gps-server.onrender.com';
 const TILE_HOSTS = ['server.arcgisonline.com', 'google.com', 'openstreetmap.org'];
 const CDN_HOSTS  = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
-const SHELL_URLS = ['index.html', 'pruebas.html', 'manifest.webmanifest', 'icon.svg', 'fondo-relieve.webp', './'];
+const SHELL_URLS = ['index.html', 'pruebas.html', 'manifest.webmanifest', 'icon.svg', 'fondo-relieve.webp', 'fondo-cafe.webp', 'fondo-arena.webp', './'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {

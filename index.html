@@ -46,6 +46,8 @@
     /* Curvas de nivel café desértico (del logo) para la barra y el riel: un mosaico SVG de
        320x200 que repite sin costura. Café y arena traen el suyo; verde va liso por ahora. */
     --topo: none;   /* verde: sin curvas por ahora, un solo color (Gilberto, 2026-09-18); café y arena sí las llevan */
+    --fondo-imagen: none;       /* textura fotográfica del tema (webp) en el body, a pantalla completa */
+    --cromo-fondo: var(--panel); /* fondo de barra y panel: transparente en los temas con imagen */
     --topo-riel: var(--topo);   /* el riel de secciones sigue a la barra, salvo que un tema diga otra cosa */
     --topo-panel: none;         /* el panel lateral entero (solo el tema relieve lo textura) */
     --topo-tam: 320px 200px;    /* tamaño del mosaico; un tema con degradado añade su capa */
@@ -61,33 +63,35 @@
      en <html> antes del primer pintado (script en <head>). Los colores del mapa
      (polígonos, marcadores) no cambian: son datos, no decoración. */
   :root[data-tema="cafe"] {
-    --bg: #1c140e; --panel: #2a1f16; --panel-2: #33261b; --border: #4a3928;
+    --bg: #2c1c0f; --panel: #2c1c0f; --panel-2: rgba(58, 40, 24, .62); --border: #5a4633;
     --text: #f4ecd8; --text-dim: #c9a97a; --accent: #8fd18a; --accent-dim: #4d6b3a;
     --danger: #f08c7d; --logo-glifo: #f4ecd8; --ok: #8fd18a; --aviso: #f5c451;
     --ok-tinte: #8fd18a22; --aviso-tinte: #f5c45122; --danger-tinte: #f08c7d22;
-    --topo: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27320%27 height=%27200%27 viewBox=%270 0 320 200%27%3E%3Cg fill=%27none%27 stroke=%27%23c9a97a%27 stroke-opacity=%270.24%27 stroke-width=%271%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M0 23.7 L8 25.3 L16 26.7 L24 27.7 L32 28.4 L40 28.7 L48 28.7 L56 28.4 L64 27.8 L72 27.1 L80 26.3 L88 25.5 L96 24.9 L104 24.3 L112 24.0 L120 23.8 L128 23.7 L136 23.7 L144 23.8 L152 23.8 L160 23.7 L168 23.4 L176 23.0 L184 22.3 L192 21.4 L200 20.2 L208 19.0 L216 17.7 L224 16.4 L232 15.2 L240 14.3 L248 13.7 L256 13.5 L264 13.7 L272 14.3 L280 15.3 L288 16.6 L296 18.3 L304 20.1 L312 21.9 L320 23.7%27/%3E%3Cpath d=%27M0 65.8 L8 66.0 L16 65.7 L24 64.9 L32 64.3 L40 64.1 L48 64.5 L56 65.6 L64 67.3 L72 69.3 L80 71.3 L88 72.8 L96 73.4 L104 73.1 L112 71.7 L120 69.4 L128 66.6 L136 63.8 L144 61.2 L152 59.3 L160 58.2 L168 58.0 L176 58.3 L184 59.1 L192 59.7 L200 59.9 L208 59.5 L216 58.4 L224 56.7 L232 54.7 L240 52.7 L248 51.2 L256 50.6 L264 50.9 L272 52.3 L280 54.6 L288 57.4 L296 60.2 L304 62.8 L312 64.7 L320 65.8%27/%3E%3Cpath d=%27M0 104.1 L8 104.3 L16 104.5 L24 104.8 L32 105.3 L40 106.0 L48 106.8 L56 107.7 L64 108.8 L72 109.9 L80 110.9 L88 111.7 L96 112.3 L104 112.6 L112 112.5 L120 111.9 L128 111.0 L136 109.7 L144 108.0 L152 106.1 L160 104.1 L168 102.1 L176 100.2 L184 98.5 L192 97.1 L200 96.1 L208 95.4 L216 95.3 L224 95.5 L232 96.0 L240 96.9 L248 97.9 L256 99.0 L264 100.1 L272 101.1 L280 102.0 L288 102.8 L296 103.3 L304 103.7 L312 103.9 L320 104.1%27/%3E%3Cpath d=%27M0 142.2 L8 143.5 L16 145.5 L24 148.3 L32 151.3 L40 154.2 L48 156.5 L56 158.0 L64 158.4 L72 157.7 L80 156.2 L88 154.3 L96 152.2 L104 150.5 L112 149.3 L120 148.8 L128 148.9 L136 149.5 L144 150.0 L152 150.2 L160 149.8 L168 148.5 L176 146.5 L184 143.7 L192 140.7 L200 137.8 L208 135.5 L216 134.0 L224 133.6 L232 134.3 L240 135.8 L248 137.7 L256 139.8 L264 141.5 L272 142.7 L280 143.2 L288 143.1 L296 142.5 L304 142.0 L312 141.8 L320 142.2%27/%3E%3Cpath d=%27M0 181.9 L8 183.6 L16 185.4 L24 187.2 L32 188.9 L40 190.4 L48 191.5 L56 192.3 L64 192.7 L72 192.6 L80 192.1 L88 191.3 L96 190.2 L104 188.9 L112 187.5 L120 186.1 L128 184.9 L136 183.8 L144 182.9 L152 182.3 L160 181.9 L168 181.7 L176 181.7 L184 181.8 L192 181.8 L200 181.9 L208 181.8 L216 181.6 L224 181.3 L232 180.7 L240 180.1 L248 179.4 L256 178.8 L264 178.2 L272 177.8 L280 177.6 L288 177.8 L296 178.3 L304 179.2 L312 180.4 L320 181.9%27/%3E%3Cpath d=%27M264.5 84.0 L267.1 88.7 L263.3 93.1 L254.6 95.6 L245.7 96.8 L238.0 98.1 L230.0 99.2 L221.4 99.1 L213.1 97.8 L204.9 95.8 L197.4 92.9 L194.0 88.5 L196.5 84.0 L201.5 80.4 L204.4 77.1 L206.5 73.0 L211.7 69.1 L220.4 67.1 L230.0 67.2 L239.0 68.2 L247.1 70.1 L253.0 73.2 L256.3 76.9 L259.7 80.3Z%27/%3E%3Cpath d=%27M250.3 84.0 L251.8 86.6 L249.6 89.1 L244.5 90.5 L239.2 91.2 L234.7 91.9 L230.0 92.6 L224.9 92.5 L220.0 91.8 L215.2 90.6 L210.8 89.0 L208.8 86.6 L210.3 84.0 L213.2 82.0 L215.0 80.1 L216.2 77.8 L219.2 75.6 L224.4 74.5 L230.0 74.6 L235.3 75.1 L240.0 76.2 L243.5 77.9 L245.5 80.0 L247.5 81.9Z%27/%3E%3Cpath d=%27M97.3 130.0 L94.8 133.1 L91.8 135.8 L87.3 138.0 L81.7 139.3 L76.1 140.6 L70.0 142.4 L62.2 143.4 L55.0 142.0 L51.3 138.6 L50.2 135.3 L48.2 132.7 L45.3 130.0 L44.6 126.9 L46.8 123.8 L50.5 121.0 L55.7 118.5 L62.7 117.4 L70.0 118.4 L75.7 120.2 L81.0 121.2 L88.1 121.6 L95.2 123.3 L98.4 126.5Z%27/%3E%3Cpath d=%27M83.7 130.0 L82.4 131.5 L80.9 132.9 L78.7 134.0 L75.8 134.7 L73.1 135.3 L70.0 136.2 L66.1 136.7 L62.5 136.0 L60.7 134.3 L60.1 132.6 L59.1 131.3 L57.7 130.0 L57.3 128.4 L58.4 126.9 L60.3 125.5 L62.8 124.3 L66.3 123.7 L70.0 124.2 L72.8 125.1 L75.5 125.6 L79.1 125.8 L82.6 126.6 L84.2 128.2Z%27/%3E%3C/g%3E%3C/svg%3E");
+    --topo: none;   /* la textura es la imagen (fondo-cafe.webp), no el SVG */
+    --fondo-imagen: url("fondo-cafe.webp"); --cromo-fondo: transparent;
   }
   /* Relieve (D, 2026-09-18): verde oliva profundo con curvas de nivel, la textura que eligió
      Gilberto (fondo-relieve.webp) sobre la barra y todo el panel lateral. Solo cambia el
-     fondo: toro, textos, acentos y pestañas son los del tema verde. */
+     fondo: toro, textos, acentos y pestañas son los del tema verde. Café y arena (2026-09-18)
+     usan el mismo mecanismo con fondo-cafe.webp y fondo-arena.webp. */
   :root[data-tema="relieve"] {
     --bg: #182311; --panel: #182311; --panel-2: rgba(20, 38, 18, .62); --border: #3a4d2c;
     --text: #edf1e4; --text-dim: #aebb9a;
-    --topo: none; --topo-panel: none;   /* aquí la textura es la imagen, no el SVG */
+    --topo: none; --topo-panel: none;   /* la textura es la imagen, no el SVG */
+    --fondo-imagen: url("fondo-relieve.webp"); --cromo-fondo: transparent;
   }
-  /* La textura de relieve es UNA imagen (fondo-relieve.webp, la que eligió Gilberto) puesta
-     en el body a pantalla completa; barra y panel van transparentes para que corra continua
+  /* Temas con imagen (relieve, café…): la textura va UNA vez en el body a pantalla completa
+     (--fondo-imagen) y barra y panel llevan --cromo-fondo transparente para que corra continua
      por los dos. En móvil el panel flota sobre el mapa, así que ahí lleva la imagen él mismo. */
-  :root[data-tema="relieve"] body { background-image: url("fondo-relieve.webp"); background-size: cover; background-position: center; }
-  :root[data-tema="relieve"] header, :root[data-tema="relieve"] .sidebar { background-color: transparent; }
   :root[data-tema="arena"] {
-    --bg: #efe6d2; --panel: #e9dcc3; --panel-2: #dfd0b2; --border: #c9b895;
-    --text: #2b1f14; --text-dim: #7a5f3f; --accent: #2f7d3a; --accent-dim: #a9c9a4;
+    --bg: #dbd2c3; --panel: #dbd2c3; --panel-2: rgba(255, 250, 240, .55); --border: #b3a48a;
+    --text: #2b1f14; --text-dim: #6e5a40; --accent: #2f7d3a; --accent-dim: #a9c9a4;
     --danger: #b23a2e; --logo-glifo: #e9dcc3; --logo-fondo: #3b2a1a; --ok: #2f7d3a; --aviso: #8a5a00;
     --ok-tinte: #2f7d3a22; --aviso-tinte: #8a5a0022; --danger-tinte: #b23a2e22;
     --aviso-fondo: #f3e4be; --aviso-borde: #b8862a;
     --gris-buscando: #6b6155; --gris-sin: #4f463c;
-    --topo: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27320%27 height=%27200%27 viewBox=%270 0 320 200%27%3E%3Cg fill=%27none%27 stroke=%27%238a6a45%27 stroke-opacity=%270.3%27 stroke-width=%271%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M0 23.7 L8 25.3 L16 26.7 L24 27.7 L32 28.4 L40 28.7 L48 28.7 L56 28.4 L64 27.8 L72 27.1 L80 26.3 L88 25.5 L96 24.9 L104 24.3 L112 24.0 L120 23.8 L128 23.7 L136 23.7 L144 23.8 L152 23.8 L160 23.7 L168 23.4 L176 23.0 L184 22.3 L192 21.4 L200 20.2 L208 19.0 L216 17.7 L224 16.4 L232 15.2 L240 14.3 L248 13.7 L256 13.5 L264 13.7 L272 14.3 L280 15.3 L288 16.6 L296 18.3 L304 20.1 L312 21.9 L320 23.7%27/%3E%3Cpath d=%27M0 65.8 L8 66.0 L16 65.7 L24 64.9 L32 64.3 L40 64.1 L48 64.5 L56 65.6 L64 67.3 L72 69.3 L80 71.3 L88 72.8 L96 73.4 L104 73.1 L112 71.7 L120 69.4 L128 66.6 L136 63.8 L144 61.2 L152 59.3 L160 58.2 L168 58.0 L176 58.3 L184 59.1 L192 59.7 L200 59.9 L208 59.5 L216 58.4 L224 56.7 L232 54.7 L240 52.7 L248 51.2 L256 50.6 L264 50.9 L272 52.3 L280 54.6 L288 57.4 L296 60.2 L304 62.8 L312 64.7 L320 65.8%27/%3E%3Cpath d=%27M0 104.1 L8 104.3 L16 104.5 L24 104.8 L32 105.3 L40 106.0 L48 106.8 L56 107.7 L64 108.8 L72 109.9 L80 110.9 L88 111.7 L96 112.3 L104 112.6 L112 112.5 L120 111.9 L128 111.0 L136 109.7 L144 108.0 L152 106.1 L160 104.1 L168 102.1 L176 100.2 L184 98.5 L192 97.1 L200 96.1 L208 95.4 L216 95.3 L224 95.5 L232 96.0 L240 96.9 L248 97.9 L256 99.0 L264 100.1 L272 101.1 L280 102.0 L288 102.8 L296 103.3 L304 103.7 L312 103.9 L320 104.1%27/%3E%3Cpath d=%27M0 142.2 L8 143.5 L16 145.5 L24 148.3 L32 151.3 L40 154.2 L48 156.5 L56 158.0 L64 158.4 L72 157.7 L80 156.2 L88 154.3 L96 152.2 L104 150.5 L112 149.3 L120 148.8 L128 148.9 L136 149.5 L144 150.0 L152 150.2 L160 149.8 L168 148.5 L176 146.5 L184 143.7 L192 140.7 L200 137.8 L208 135.5 L216 134.0 L224 133.6 L232 134.3 L240 135.8 L248 137.7 L256 139.8 L264 141.5 L272 142.7 L280 143.2 L288 143.1 L296 142.5 L304 142.0 L312 141.8 L320 142.2%27/%3E%3Cpath d=%27M0 181.9 L8 183.6 L16 185.4 L24 187.2 L32 188.9 L40 190.4 L48 191.5 L56 192.3 L64 192.7 L72 192.6 L80 192.1 L88 191.3 L96 190.2 L104 188.9 L112 187.5 L120 186.1 L128 184.9 L136 183.8 L144 182.9 L152 182.3 L160 181.9 L168 181.7 L176 181.7 L184 181.8 L192 181.8 L200 181.9 L208 181.8 L216 181.6 L224 181.3 L232 180.7 L240 180.1 L248 179.4 L256 178.8 L264 178.2 L272 177.8 L280 177.6 L288 177.8 L296 178.3 L304 179.2 L312 180.4 L320 181.9%27/%3E%3Cpath d=%27M264.5 84.0 L267.1 88.7 L263.3 93.1 L254.6 95.6 L245.7 96.8 L238.0 98.1 L230.0 99.2 L221.4 99.1 L213.1 97.8 L204.9 95.8 L197.4 92.9 L194.0 88.5 L196.5 84.0 L201.5 80.4 L204.4 77.1 L206.5 73.0 L211.7 69.1 L220.4 67.1 L230.0 67.2 L239.0 68.2 L247.1 70.1 L253.0 73.2 L256.3 76.9 L259.7 80.3Z%27/%3E%3Cpath d=%27M250.3 84.0 L251.8 86.6 L249.6 89.1 L244.5 90.5 L239.2 91.2 L234.7 91.9 L230.0 92.6 L224.9 92.5 L220.0 91.8 L215.2 90.6 L210.8 89.0 L208.8 86.6 L210.3 84.0 L213.2 82.0 L215.0 80.1 L216.2 77.8 L219.2 75.6 L224.4 74.5 L230.0 74.6 L235.3 75.1 L240.0 76.2 L243.5 77.9 L245.5 80.0 L247.5 81.9Z%27/%3E%3Cpath d=%27M97.3 130.0 L94.8 133.1 L91.8 135.8 L87.3 138.0 L81.7 139.3 L76.1 140.6 L70.0 142.4 L62.2 143.4 L55.0 142.0 L51.3 138.6 L50.2 135.3 L48.2 132.7 L45.3 130.0 L44.6 126.9 L46.8 123.8 L50.5 121.0 L55.7 118.5 L62.7 117.4 L70.0 118.4 L75.7 120.2 L81.0 121.2 L88.1 121.6 L95.2 123.3 L98.4 126.5Z%27/%3E%3Cpath d=%27M83.7 130.0 L82.4 131.5 L80.9 132.9 L78.7 134.0 L75.8 134.7 L73.1 135.3 L70.0 136.2 L66.1 136.7 L62.5 136.0 L60.7 134.3 L60.1 132.6 L59.1 131.3 L57.7 130.0 L57.3 128.4 L58.4 126.9 L60.3 125.5 L62.8 124.3 L66.3 123.7 L70.0 124.2 L72.8 125.1 L75.5 125.6 L79.1 125.8 L82.6 126.6 L84.2 128.2Z%27/%3E%3C/g%3E%3C/svg%3E");
+    --topo: none;   /* la textura es la imagen (fondo-arena.webp), no el SVG */
+    --fondo-imagen: url("fondo-arena.webp"); --cromo-fondo: transparent;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -101,6 +105,7 @@
     height: 100vh;
     height: -webkit-fill-available;
     height: 100dvh;
+    background-image: var(--fondo-imagen); background-size: cover; background-position: center;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -109,7 +114,7 @@
   header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 20px;
-    background-color: var(--panel);
+    background-color: var(--cromo-fondo);
     background-image: var(--topo); background-size: var(--topo-tam);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -166,7 +171,7 @@
   /* ── Layout ── */
   .main { flex: 1; display: flex; overflow: hidden; }
   .sidebar {
-    width: 320px; background-color: var(--panel);
+    width: 320px; background-color: var(--cromo-fondo);
     background-image: var(--topo-panel); background-size: var(--topo-tam);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
@@ -365,9 +370,9 @@
       padding-bottom: env(safe-area-inset-bottom, 0px);
       background-color: var(--panel);
     }
-    :root[data-tema="relieve"] .sidebar-tabs { background-color: transparent; }
-    :root[data-tema="relieve"] .sidebar {
-      background-color: var(--bg); background-image: url("fondo-relieve.webp");
+    .sidebar-tabs { background-color: transparent; }   /* deja ver el panel (color o imagen) */
+    .sidebar {
+      background-color: var(--panel); background-image: var(--fondo-imagen);
       background-size: cover; background-position: center bottom;
     }
     .sidebar-tab {
