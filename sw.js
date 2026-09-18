@@ -21,7 +21,9 @@
 //                    el script de sincronizacion le pega ademas el SHA del
 //                    maestro a este VER, en la copia que sube — asi cada
 //                    commit invalida la cache aunque nadie se acuerde.
-const VER = 'lindero-v8-a11cf9e';
+//   v9 (2026-09-18): toro del logo en la barra (SVG en linea), temas verde/cafe/arena,
+//                    pestañas sin emojis y barra inferior en movil.
+const VER = 'lindero-v9-198fc17';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
