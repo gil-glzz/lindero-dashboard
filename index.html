@@ -129,6 +129,8 @@
     transition: all .15s; width: 100%;
   }
   .btn:hover { background: var(--accent-dim); border-color: var(--accent); }
+  /* 2026-09-18: un botón deshabilitado debe VERSE deshabilitado (el de «Apagar cerca origen» se veía activo) */
+  .btn:disabled, .btn[disabled] { opacity: .45; cursor: not-allowed; filter: saturate(.4); }
   .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
   .btn-primary:hover { background: #3dd16f; }
   .btn-sm { padding: 5px 10px; font-size: 11px; width: auto; }
@@ -442,6 +444,7 @@
         <div class="field">
           <label>Lote asignado</label>
           <select id="cerca-lote"></select>
+          <p style="font-size:11px; color:var(--text-dim); margin:4px 0 0;">Opcional: la cerca de contención <b>adopta sola</b> a los animales que se paren dentro.</p>
         </div>
         <div class="field">
           <label>Nombre del potrero</label>
@@ -504,6 +507,19 @@
         <button class="btn" onclick="abrirNuevaCerca()" style="margin-top:8px">
           + Nueva cerca
         </button>
+
+        <!-- 🆕 2026-09-18 ROTACIÓN DE POTRERO: origen → destino con dos cercas empalmadas -->
+        <p class="sec-title" style="margin-top:22px;">Rotación de potrero 🔄</p>
+        <div id="rotacion-card" class="lote-card" style="cursor:default;">
+          <div id="rotacion-nueva">
+            <p style="font-size:12px; color:var(--text-dim); margin:0 0 8px;">Elige la cerca donde están hoy y la cerca a la que pasan. Cada animal cambia solo al pisar el destino; cuando todos cruzaron podrás apagar la de origen.</p>
+            <div class="field"><label>Cerca origen (donde están)</label><select id="rot-origen"></select></div>
+            <div class="field"><label>Cerca destino (a donde van)</label><select id="rot-destino"></select></div>
+            <p id="rot-aviso" style="font-size:11px; color:#fbbf24; margin:0 0 8px; display:none;"></p>
+            <button class="btn btn-primary" onclick="iniciarRotacion()" style="width:100%;">Iniciar rotación</button>
+          </div>
+          <div id="rotacion-activa" style="display:none;"></div>
+        </div>
       </div>
 
       <!-- MODO ARREO (v6) -->
@@ -546,6 +562,7 @@
         <div class="field">
           <label>¿A quién cerca?</label>
           <select id="ec-lote"></select>
+          <p style="font-size:11px; color:var(--text-dim); margin:4px 0 0;">Las cercas de contención <b>adoptan solas</b> al animal que se pare dentro (3 posiciones seguidas) y lo conservan aunque salga. Este selector solo importa para exclusión o cercas viejas.</p>
           <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
             Si eliges un lote, la cerca sigue al lote: el animal que metas
             después la hereda solo.</p>
@@ -1691,6 +1708,12 @@ function refreshCercaLoteSelect() {
 //  lugar prohibido. Un animal con solo exclusiones esta suelto.
 function cercaQueAplica(collar, loteId) {
   const a = collar ? animales.find(x => x.collar === collar) : null;
+  // 🆕 2026-09-18 — ADOPCIÓN: si el servidor ya le asignó cerca (cerca_id), esa es la suya y punto.
+  //  Es lo mismo que decide el servidor al repartir al gateway (ver camino d en /geovallas).
+  if (a && a.cerca_id != null) {
+    const propia = cercas.find(c => c.id === a.cerca_id && c.activa !== false && c.tipo !== 'exclusion' && c.tipo !== 'simbolica');
+    if (propia) return propia;
+  }
   const lote = loteId !== undefined ? loteId : (a ? a.lote : null);
   return cercas.find(c => {
     if (c.activa === false || c.tipo === 'simbolica' || c.tipo === 'exclusion') return false;
@@ -1727,8 +1750,9 @@ function renderAnimalesList() {
       <div class="lote-meta">
         <span>${conexion}</span><span style="color:${bateriaColor(a.bateria)}">${bateriaIcono(a.bateria)} ${esc(a.bateria)}%${a.carga === 1 ? ' ⚡' : ''}</span>
       </div>${(a.bloqueado && enLinea) ? '<div class="lote-meta"><span style="color:#fbbf24">⛔ estímulo bloqueado</span></div>' : ''}${
-        cercaQueAplica(a.collar) ? '' :
-        '<div class="lote-meta"><span style="color:#fbbf24">⚠ sin cerca asignada</span></div>'}
+        (() => { const cq = cercaQueAplica(a.collar);
+                 if (!cq) return '<div class="lote-meta"><span style="color:#fbbf24">⚠ sin cerca: la adopta la primera cerca donde se pare</span></div>';
+                 return `<div class="lote-meta"><span style="color:var(--text-dim)">🧭 cerca: <b style="color:var(--text)">${esc(cq.nombre)}</b>${a.cerca_id === cq.id ? ' · adoptado' : ''}</span></div>`; })()}
     </div>`;
   }).join('');
 }
@@ -2153,7 +2177,7 @@ function showTab(t) {
     document.querySelectorAll('.sidebar-tab')[tabMap[t]].classList.add('active');
   }
   if (t === 'cerca') refreshCercaLoteSelect();
-  if (t === 'cercas') renderCercasList();
+  if (t === 'cercas') { renderCercasList(); cargarRotacion(); }
   if (t === 'agua') renderAguajes();
   if (t === 'infra') cargarInstalaciones();
   if (t === 'arreo') cargarArreo();
@@ -2240,6 +2264,7 @@ async function cargarPerfilesIniciales() {
           id: Number(a.id), nombre: a.nombre, collar: a.collar, arete: a.arete, id_visual: a.id_visual || '',
           peso: a.peso, edad: a.edad, raza: a.raza, sexo: a.sexo,
           lote: a.lote ? Number(a.lote) : null, notas: a.notas,
+          cerca_id: a.cerca_id != null ? Number(a.cerca_id) : null,   // 🆕 2026-09-18: la cerca que lo adoptó
           estado: 'ok', actividad: 0, bateria: 100,
           lat: CENTRO[0], lng: CENTRO[1]
         }));
@@ -2324,6 +2349,15 @@ async function actualizarDesdeServidor() {
   } catch(e) {}
 
   // 1. Posiciones de los collares (datos en vivo sobre los perfiles)
+  // 🆕 2026-09-18: la cerca de cada animal la decide el servidor (adopción/rotación); se refresca
+  //  cada 15 s, y la rotación cada 5 s mientras haya una activa o el panel de Cercas esté abierto.
+  try {
+    window._tickAdopcion = (window._tickAdopcion || 0) + 1;
+    if (window._tickAdopcion % 3 === 0) await refrescarCercaDeAnimales();
+    const paneCercas = document.getElementById('pane-cercas');
+    if (rotacionEstado || (paneCercas && paneCercas.style.display === 'block')) await cargarRotacion();
+  } catch(e) {}
+
   try {
     const res = await authFetch(`${API_BASE}/collares`);
     if (res.ok) {
@@ -3085,6 +3119,93 @@ function textoArea(m2) {
     return ha.toFixed(ha < 10 ? 2 : 1) + ' ha';
   }
   return Math.round(m2).toLocaleString('es-MX') + ' m²';
+}
+
+// ════════════════════════════════════════════════════════════
+//  ROTACIÓN DE POTRERO (2026-09-18) — origen → destino
+// ════════════════════════════════════════════════════════════
+let rotacionEstado = null;   // lo que devuelve GET /rotacion (null = ninguna activa)
+
+async function refrescarCercaDeAnimales() {
+  const res = await authFetch(`${API_BASE}/animales`);
+  if (!res.ok) return;
+  const filas = await res.json();
+  let cambio = false;
+  filas.forEach(f => {
+    const a = animales.find(x => x.id === Number(f.id)); if (!a) return;
+    const nueva = f.cerca_id != null ? Number(f.cerca_id) : null;
+    if (a.cerca_id !== nueva) { a.cerca_id = nueva; cambio = true; }
+  });
+  if (cambio) { renderAnimalesList(); if (typeof refrescarModalSiAbierto === 'function') refrescarModalSiAbierto(); }
+}
+
+async function cargarRotacion() {
+  try {
+    const res = await authFetch(`${API_BASE}/rotacion`);
+    if (!res.ok) return;
+    rotacionEstado = await res.json();
+  } catch(e) { return; }
+  renderRotacion();
+}
+
+function renderRotacion() {
+  const nueva = document.getElementById('rotacion-nueva'), activa = document.getElementById('rotacion-activa');
+  if (!nueva || !activa) return;
+  const contencion = cercas.filter(c => c.activa !== false && (c.tipo === 'permanente' || c.tipo === 'temporal'));
+  if (!rotacionEstado) {
+    nueva.style.display = 'block'; activa.style.display = 'none';
+    const conAnimales = id => animales.filter(a => a.cerca_id === id).length;
+    const opts = contencion.map(c => `<option value="${c.id}">${esc(c.nombre)} (${conAnimales(c.id)} adoptados)</option>`).join('');
+    const so = document.getElementById('rot-origen'), sd = document.getElementById('rot-destino');
+    const vo = so.value, vd = sd.value;
+    so.innerHTML = opts; sd.innerHTML = opts;
+    if (vo) so.value = vo; if (vd) sd.value = vd;
+    // Por defecto: origen = la cerca con más animales adoptados (donde están hoy); destino = otra.
+    if (!vo && contencion.length) so.value = String(contencion.slice().sort((a, b) => conAnimales(b.id) - conAnimales(a.id))[0].id);
+    if ((!vd || sd.value === so.value) && contencion.length > 1) sd.value = String(contencion.find(c => String(c.id) !== so.value).id);
+    return;
+  }
+  nueva.style.display = 'none'; activa.style.display = 'block';
+  const r = rotacionEstado, total = r.faltan.length + r.pasaron.length;
+  const pct = total ? Math.round(100 * r.pasaron.length / total) : 0;
+  activa.innerHTML = `
+    <div style="font-size:13px; margin-bottom:6px;"><b>${esc(r.origen_nombre || 'origen')}</b> → <b>${esc(r.destino_nombre || 'destino')}</b></div>
+    <div style="font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;">${r.pasaron.length} de ${total} <span style="font-size:13px; font-weight:400; color:var(--text-dim);">ya pasaron</span></div>
+    <div style="height:8px; border-radius:4px; background:#374151; margin:8px 0;"><div style="height:8px; border-radius:4px; width:${pct}%; background:${r.listo ? '#4ade80' : '#fbbf24'}; transition:width .4s;"></div></div>
+    ${r.faltan.length ? `<div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Faltan: ${r.faltan.map(a => esc(a.nombre || a.collar)).join(', ')}</div>`
+                      : '<div style="font-size:12px; color:#4ade80; margin-bottom:8px;">✓ Todos están en el destino. Ya puedes apagar la cerca de origen.</div>'}
+    <button class="btn btn-primary" id="rot-apagar" onclick="terminarRotacion()" style="width:100%;" ${r.listo ? '' : 'disabled title="Aún hay animales en la cerca de origen"'}>Apagar cerca origen</button>
+    <button class="btn btn-ghost" onclick="cancelarRotacion()" style="width:100%; margin-top:6px;">Cancelar rotación (no toca cercas)</button>`;
+}
+
+async function iniciarRotacion() {
+  const origen = parseInt(document.getElementById('rot-origen').value), destino = parseInt(document.getElementById('rot-destino').value);
+  const aviso = document.getElementById('rot-aviso');
+  if (!origen || !destino || origen === destino) { aviso.textContent = 'Elige dos cercas distintas.'; aviso.style.display = 'block'; return; }
+  const res = await authFetch(`${API_BASE}/rotacion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origen, destino }) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { aviso.textContent = d.error || ('Error ' + res.status); aviso.style.display = 'block'; return; }
+  aviso.style.display = 'none';
+  if (d.empalman === false) alert('Ojo: esas dos cercas no se empalman. La rotación se inició, pero nadie podrá cruzar hasta que haya paso entre ellas.');
+  await cargarRotacion();
+}
+
+async function terminarRotacion() {
+  if (!rotacionEstado) return;
+  if (!confirm(`¿Apagar la cerca "${rotacionEstado.origen_nombre}"? Los ${rotacionEstado.pasaron.length} animales quedan contenidos por "${rotacionEstado.destino_nombre}".`)) return;
+  const res = await authFetch(`${API_BASE}/rotacion/terminar`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(d.error || ('No se pudo apagar: ' + res.status)); await cargarRotacion(); return; }
+  // el servidor ya apagó la cerca origen: reflejarlo en memoria sin esperar la siguiente carga
+  const co = cercas.find(c => c.id === rotacionEstado.origen_id); if (co) co.activa = false;
+  rotacionEstado = null;
+  renderCercas(); renderCercasList(); renderAnimalesList(); await cargarRotacion();
+}
+
+async function cancelarRotacion() {
+  if (!confirm('¿Cancelar la rotación? No se apaga ninguna cerca; los que ya cruzaron se quedan en el destino.')) return;
+  await authFetch(`${API_BASE}/rotacion/cancelar`, { method: 'POST' });
+  rotacionEstado = null; await cargarRotacion();
 }
 
 function renderCercasList() {
