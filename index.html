@@ -57,6 +57,7 @@
     --ok-tinte: #4ade8022; --aviso-tinte: #fbbf2422; --danger-tinte: #f8717122;   /* fondo tenue del chip del collar */
     --aviso-fondo: #3b2f0e; --aviso-borde: #a16207;   /* tarjeta y chip de arreo */
     --gris-buscando: #9ca3af; --gris-sin: #6b7280;    /* estados de conexión del collar */
+    --sin-gps: #7fb0d6;   /* 🆕 punto 18: conectado pero sin GPS confiable (no es «sin señal») */
   }
   /* ── Temas (2026-09-18) ── El ranchero elige bajo «Salir»: verde (el de siempre),
      café desértico, arena o relieve verde. Vive en localStorage (lindero_tema) y llega como data-tema
@@ -89,7 +90,7 @@
     --danger: #b23a2e; --logo-glifo: #e9dcc3; --logo-fondo: #3b2a1a; --ok: #2f7d3a; --aviso: #8a5a00;
     --ok-tinte: #2f7d3a22; --aviso-tinte: #8a5a0022; --danger-tinte: #b23a2e22;
     --aviso-fondo: #f3e4be; --aviso-borde: #b8862a;
-    --gris-buscando: #6b6155; --gris-sin: #4f463c;
+    --gris-buscando: #6b6155; --gris-sin: #4f463c; --sin-gps: #2f5f86;
     --topo: none;   /* la textura es la imagen (fondo-arena.webp), no el SVG */
     --fondo-imagen: url("fondo-arena.webp"); --cromo-fondo: transparent;
   }
@@ -521,6 +522,7 @@
     <div class="hstat"><div class="num" id="stat-lotes">0</div><div class="lbl">lotes</div></div>
     <div class="hstat"><div class="num" style="color:var(--accent)" id="stat-dentro">0</div><div class="lbl">dentro</div></div>
     <div class="hstat"><div class="num" style="color:var(--danger)" id="stat-alertas">0</div><div class="lbl">alertas</div></div>
+    <div class="hstat" id="hstat-singps" style="display:none"><div class="num" style="color:var(--sin-gps)" id="stat-singps">0</div><div class="lbl">sin GPS</div></div>
     <div class="hstat"><div class="num" style="color:var(--text-dim)" id="stat-sinsenal">0</div><div class="lbl">sin señal</div></div>
     <div style="position:relative;">
       <button onclick="toggleAlertas()" title="Alertas" style="position:relative; background:transparent; border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:16px; margin-left:8px;">
@@ -1409,6 +1411,26 @@ function estaEnLinea(a) {
   return (Date.now() - a.ultimaConexion) < UMBRAL_EN_LINEA_MS;
 }
 
+// 🆕 2026-09-23 (punto 18): el collar conversa con el gateway pero no confía en su GPS (bajo techo,
+//  árboles). Manda "sin GPS" en su turno y el servidor guarda ese latido. No es «sin señal»: el
+//  collar está vivo y su cerca sigue en su memoria; lo que falta es una posición fresca.
+function sinGpsReciente(a) {
+  return !!a.sinGpsTs && (Date.now() - a.sinGpsTs) < UMBRAL_EN_LINEA_MS;
+}
+// «Satélites 5 · HDOP 3.1», solo con números (se pinta con innerHTML)
+function detalleSinGps(a) {
+  const partes = [];
+  const s = Number(a.sinGpsSats), h = Number(a.sinGpsHdop);
+  if (a.sinGpsSats != null && isFinite(s)) partes.push(Math.round(s) + ' satélites');
+  if (a.sinGpsHdop != null && isFinite(h) && h < 99) partes.push('HDOP ' + h.toFixed(1));
+  return partes.join(' · ');
+}
+// La señal de vida más reciente que no sea una posición (latido sin GPS o salud), si es más nueva.
+function vidaMasReciente(a) {
+  const v = Math.max(a.sinGpsTs || 0, a.saludTs || 0);
+  return v > (a.ultimaConexion || 0) ? v : 0;
+}
+
 // ⛔ CORREGIDO 2026-08-06: al entrar, los perfiles se cargan SIN hora de última
 // conexión (esa llega en el primer refresco de posiciones, unos segundos después),
 // así que todo aparecía "sin señal" al abrir la app aunque el collar estuviera
@@ -1428,10 +1450,12 @@ function estadoConexion(a) {
     // no puede durar para siempre: un animal recién registrado tiene unos
     // segundos de gracia mientras llega su primera posición, y pasado ese
     // plazo el silencio ya es una respuesta.
+    if (sinGpsReciente(a)) return 'singps';
     if (!a._buscandoDesde) a._buscandoDesde = Date.now();
     return (Date.now() - a._buscandoDesde < GRACIA_BUSCANDO_MS) ? 'cargando' : 'sin';
   }
-  return estaEnLinea(a) ? 'linea' : 'sin';
+  if (estaEnLinea(a)) return 'linea';
+  return sinGpsReciente(a) ? 'singps' : 'sin';
 }
 
 function renderAnimales() {
@@ -1450,8 +1474,10 @@ function renderAnimales() {
     const borderColor = a.estado === 'shock' ? '#f87171' : a.estado === 'warn' ? '#fbbf24' : 'white';
     // "buscando" no es "sin señal": se ve atenuado pero conserva su color, para no
     // dar el susto de un ganado gris al abrir la app.
-    const opacidad = est === 'linea' ? '1' : (est === 'cargando' ? '0.7' : '0.5');
-    const borde = est === 'linea' ? 'solid' : 'dashed';
+    //  🆕 punto 18: «sin GPS» conserva el color del lote con borde PUNTEADO: el collar vive, pero el
+    //  punto es su última posición conocida, no la de ahora.
+    const opacidad = est === 'linea' ? '1' : (est === 'cargando' ? '0.7' : (est === 'singps' ? '0.75' : '0.5'));
+    const borde = est === 'linea' ? 'solid' : (est === 'singps' ? 'dotted' : 'dashed');
     const icon = L.divIcon({
       className: '',
       html: `<div class="animal-marker" style="width:18px;height:18px;background:${safeColor(color)};border-color:${safeColor(borderColor)};border-style:${borde};opacity:${opacidad}">`
@@ -1461,7 +1487,7 @@ function renderAnimales() {
     });
     const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
     m.on('click', () => abrirPerfilAnimal(a.id));
-    m.bindTooltip(esc(a.nombre) + (enLinea ? '' : ' (sin señal)'), { direction: 'top', offset: [0,-10] });
+    m.bindTooltip(esc(a.nombre) + (enLinea ? '' : (est === 'singps' ? ' (sin GPS confiable)' : ' (sin señal)')), { direction: 'top', offset: [0,-10] });
     animalMarkers[a.id] = m;
   });
   ajustarEtiquetasArete();
@@ -1742,7 +1768,8 @@ function renderLotes() {
     // C-1 (2026-07-24): las cuatro categorías suman el total sin mentir. Los sin
     // señal se cuentan aparte; entre los EN LÍNEA: fuera=cruzó, aviso=borde, dentro=resto.
     const enLinea  = enLote.filter(a => estaEnLinea(a));
-    const sinSenal = count - enLinea.length;
+    const sinGps   = enLote.filter(a => estadoConexion(a) === 'singps').length;   // 🆕 punto 18
+    const sinSenal = count - enLinea.length - sinGps;
     const fuera    = enLinea.filter(a => a.estado === 'shock').length;
     const aviso    = enLinea.filter(a => a.estado === 'warn').length;
     const dentro   = enLinea.length - fuera - aviso;
@@ -1758,6 +1785,7 @@ function renderLotes() {
         <span style="color:var(--ok);">● ${dentro} dentro</span>
         <span style="color:var(--aviso);">● ${aviso} aviso</span>
         <span style="color:var(--danger);">● ${fuera} fuera</span>
+        ${sinGps ? `<span style="color:var(--sin-gps);">◌ ${sinGps} sin GPS</span>` : ''}
         ${sinSenal ? `<span style="color:var(--gris-sin);">○ ${sinSenal} sin señal</span>` : ''}
       </div>
       <div class="lote-meta" style="margin-top:4px;">
@@ -1923,6 +1951,8 @@ function renderAnimalesList() {
       ? '<span style="color:var(--gris-buscando)">◌ buscando…</span>'
       : est === 'linea'
       ? '<span style="color:var(--ok)">● en línea</span>'
+      : est === 'singps'
+      ? '<span style="color:var(--sin-gps)">◌ sin GPS confiable</span>'
       : '<span style="color:var(--gris-sin)">○ sin señal</span>';
     return `<div class="lote-card" onclick="abrirPerfilAnimal(${a.id})">
       <div class="lote-head">
@@ -1988,8 +2018,15 @@ function abrirPerfilAnimal(id) {
     ultconEl.innerHTML = '<span style="color:var(--gris-buscando)">◌ Buscando…</span>';
   } else if (estaEnLinea(a)) {
     ultconEl.innerHTML = '<span style="color:var(--ok)">● En línea</span> · ' + tiempoRelativo(a.ultimaConexion);
+  } else if (estadoConexion(a) === 'singps') {
+    // 🆕 punto 18: vivo y hablando, sin posición fresca. Se dice por qué y desde cuándo.
+    const det = detalleSinGps(a);
+    ultconEl.innerHTML = '<span style="color:var(--sin-gps)">◌ Conectado, sin GPS confiable</span>'
+      + (det ? ' · ' + det : '') + ' · última posición ' + tiempoRelativo(a.ultimaConexion);
   } else {
-    ultconEl.innerHTML = '<span style="color:var(--gris-sin)">○ Sin señal</span> · ' + tiempoRelativo(a.ultimaConexion);
+    const vida = vidaMasReciente(a);
+    ultconEl.innerHTML = '<span style="color:var(--gris-sin)">○ Sin señal</span> · última posición ' + tiempoRelativo(a.ultimaConexion)
+      + (vida ? ' · última señal de vida ' + tiempoRelativo(vida) : '');
   }
   document.getElementById('modal-distborde').textContent =
     (a.distBorde != null && a.distBorde < 9000) ? Math.round(a.distBorde) + ' m' : '—';
@@ -2008,7 +2045,9 @@ function abrirPerfilAnimal(id) {
 
   // C-2 (2026-07-24): el modal se repinta en cada refresco (ver refrescarModalSiAbierto).
   document.getElementById('modal-frescura').innerHTML =
-    estaEnLinea(a) ? ' · <span style="color:var(--ok)">● en vivo</span>' : ' · <span style="color:var(--gris-sin)">○ sin señal</span>';
+    estaEnLinea(a) ? ' · <span style="color:var(--ok)">● en vivo</span>'
+      : (estadoConexion(a) === 'singps' ? ' · <span style="color:var(--sin-gps)">◌ sin GPS confiable</span>'
+                                        : ' · <span style="color:var(--gris-sin)">○ sin señal</span>');
 
   renderBienestar(a);
 
@@ -2398,8 +2437,12 @@ function updateStats() {
     animales.filter(a => estaEnLinea(a) && a.estado !== 'warn' && a.estado !== 'shock').length;
   document.getElementById('stat-alertas').textContent =
     animales.filter(a => a.estado === 'warn' || a.estado === 'shock').length;
+  // 🆕 punto 18: «sin GPS» aparte; «sin señal» ya no cuenta a los que sí conversan.
+  const nSinGps = animales.filter(a => estadoConexion(a) === 'singps').length;
+  document.getElementById('stat-singps').textContent = nSinGps;
+  document.getElementById('hstat-singps').style.display = nSinGps ? '' : 'none';
   document.getElementById('stat-sinsenal').textContent =
-    animales.filter(a => !estaEnLinea(a)).length;
+    animales.filter(a => !estaEnLinea(a) && estadoConexion(a) !== 'singps').length;
 }
 
 // Color picker para lotes
@@ -2608,6 +2651,12 @@ async function actualizarDesdeServidor() {
           //  justo el estado que hay que ver cambiar.
           a.bloqueado = !!c.bloqueado;
           a.arreo     = !!c.arreo;
+          // 🆕 2026-09-23 (punto 18): último latido sin GPS y última salud. Asignación directa: si el
+          //  servidor viejo no los manda, quedan en null y el tablero se comporta como antes.
+          a.sinGpsTs   = c.sin_gps_ts ? new Date(c.sin_gps_ts).getTime() : null;
+          a.sinGpsSats = c.sin_gps_sats != null ? c.sin_gps_sats : null;
+          a.sinGpsHdop = c.sin_gps_hdop != null ? c.sin_gps_hdop : null;
+          a.saludTs    = c.salud_ts ? new Date(c.salud_ts).getTime() : null;
         }
       });
       // ⛔ CORREGIDO 2026-08-26: aquí se redibujaba el MAPA (renderAnimales) y los
