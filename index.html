@@ -332,6 +332,60 @@
   .scroll-thin::-webkit-scrollbar { width: 6px; }
   .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+  /* ── Cercas: vértices siempre visibles y edición sobre el mapa (2026-10-07, D3) ──
+     Los puntos de todas las cercas van en UN lienzo (canvas) que no recibe toques: el toque lo
+     resuelve el tablero por distancia (ver elegirVertice). Mantener un punto 3 s desbloquea su
+     cerca; mientras, el mapa no muestra el menú del sistema ni selecciona texto. */
+  #map .leaflet-map-pane, #map .leaflet-map-pane img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  #map .leaflet-popup-content { -webkit-user-select: text; user-select: text; }
+  .leaflet-verticesCerca-pane, .leaflet-verticesCerca-pane canvas { pointer-events: none !important; }
+  /* Con una cerca desbloqueada, las demás no abren su ventanita: el doble toque en el mapa guarda. */
+  #map.cerca-desbloqueada path.leaflet-interactive { pointer-events: none; }
+  .anillo-cerca {
+    position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+    pointer-events: none; z-index: 1001; display: none;
+  }
+  .anillo-cerca svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .anillo-cerca circle { fill: none; stroke-width: 6; }
+  .anillo-cerca .fondo { stroke: rgba(0,0,0,.35); }
+  .anillo-cerca .progreso {
+    stroke: #fff; stroke-linecap: round; stroke-dasharray: 169.65; stroke-dashoffset: 169.65;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,.8));
+  }
+  .anillo-cerca.lleno .progreso { animation: lindero-llenar var(--ms, 3000ms) linear forwards; }
+  @keyframes lindero-llenar { to { stroke-dashoffset: 0; } }
+  .vertice-edicion { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: grab; }
+  .vertice-edicion > span {
+    width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.45);
+  }
+  .medio-edicion { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: copy; }
+  .medio-edicion > span {
+    width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,.75); color: #111;
+    font: 700 12px/14px var(--font-body); text-align: center; box-shadow: 0 0 0 1.5px rgba(0,0,0,.45);
+  }
+  .barra-cerca {
+    position: absolute; top: 12px; left: 12px; z-index: 1000; display: none;
+    max-width: min(380px, calc(100% - 150px)); background: var(--panel); color: var(--text);
+    border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.45); font-size: 12px; line-height: 1.4;
+  }
+  .barra-cerca .bc-fila { display: flex; align-items: center; gap: 6px; }
+  .barra-cerca .bc-titulo { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-cerca .bc-fila .btn { width: auto; padding: 6px 10px; font-size: 12px; flex-shrink: 0; }
+  .barra-cerca .bc-estado { margin-top: 4px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+  .barra-cerca .bc-estado.mal { color: var(--danger); font-weight: 600; }
+  .barra-cerca .bc-ayuda { margin-top: 3px; color: var(--text-dim); font-size: 11px; }
+  .barra-cerca .bc-msg { margin-top: 6px; white-space: pre-line; display: none; max-height: 9em; overflow-y: auto; }
+  .barra-cerca .bc-msg.error { color: var(--danger); }
+  .barra-cerca .bc-msg.nota { color: var(--aviso); }
+  .aviso-mapa {
+    position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 1001;
+    display: none; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 8px;
+    background: rgba(13,20,16,.92); color: #fff; font-size: 13px; text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,.5); pointer-events: none; white-space: pre-line;
+  }
+
   /* Tirador para arrastrar el panel en móvil (oculto en desktop) */
   .sheet-handle { display: none; }
 
@@ -436,6 +490,8 @@
     /* Controles del mapa más arriba para no chocar con el panel */
     .map-controls { top: 10px; right: 10px; }
     .map-btn { padding: 9px 13px; font-size: 13px; }
+    /* En el teléfono, a todo lo ancho y encima de los botones del mapa (solo mientras se edita). */
+    .barra-cerca { top: 8px; left: 8px; right: 8px; max-width: none; z-index: 1001; padding: 8px 10px; }
 
     /* Áreas táctiles más grandes en móvil */
     .btn { padding: 12px 14px; font-size: 14px; }
@@ -753,11 +809,13 @@
           <label>Color de la cerca</label>
           <div class="color-picker" id="ec-colors"></div>
         </div>
-        <button class="btn" id="ec-shape-btn" onclick="toggleEditarForma()" style="margin-bottom:8px">
-          ✎ Editar forma (arrastrar puntos)
+        <button class="btn" id="ec-shape-btn" onclick="editarFormaDesdePanel()" style="margin-bottom:8px">
+          ✎ Editar forma en el mapa
         </button>
         <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px; line-height:1.5">
-          Arrastra los puntos de colores para mover las esquinas; la manija <b>✥</b> del centro mueve la cerca completa. Toca el borde para agregar un punto. Doble clic en un punto para quitarlo.
+          También sin abrir este panel: <b>mantén presionado 3 segundos</b> cualquier punto de la cerca en el mapa.
+          Arrastra los puntos; <b>＋</b> agrega una esquina; doble toque en un punto lo quita; la manija <b>✥</b> mueve la cerca completa.
+          <b>Guardar cambios</b> (o doble toque en el mapa) guarda la forma junto con lo de arriba.
         </p>
         <button class="btn" onclick="duplicarCerca()" style="margin-bottom:8px">⧉ Duplicar cerca</button>
         <button class="btn btn-primary" onclick="guardarEdicionCerca()">Guardar cambios</button>
@@ -829,6 +887,18 @@
       <button class="map-btn" id="layer-terr" onclick="setLayer('terr')">Terreno</button>
       <button class="map-btn" id="btn-cambiar-sat" onclick="cambiarSatelite()" title="Cambiar proveedor de satélite si no carga">⟳ Otro satélite</button>
     </div>
+    <!-- 🆕 2026-10-07 (D3): barra de la cerca desbloqueada (mantener un punto 3 s, o «Editar forma») -->
+    <div id="barra-cerca" class="barra-cerca" role="region" aria-label="Edición de la forma de la cerca">
+      <div class="bc-fila">
+        <div class="bc-titulo">✎ <span id="bc-nombre"></span></div>
+        <button class="btn btn-primary" id="bc-guardar" onclick="guardarCercaDesbloqueada()">Guardar</button>
+        <button class="btn btn-ghost" id="bc-cancelar" onclick="cancelarDesbloqueo()">Cancelar</button>
+      </div>
+      <div class="bc-estado" id="bc-estado"></div>
+      <div class="bc-ayuda">Arrastra los puntos · <b>+</b> agrega esquina · doble toque en un punto lo quita · <b>✥</b> mueve todo · <b>doble toque en el mapa guarda</b> · Esc cancela</div>
+      <div class="bc-msg" id="bc-msg"></div>
+    </div>
+    <div id="aviso-mapa" class="aviso-mapa" role="status" aria-live="polite"></div>
   </div>
 </div>
 
@@ -1245,6 +1315,11 @@ let animales = [
   { id:_ID_SEMILLA + 1, nombre:'Collar 01', collar:'collar_01', lote:_ID_SEMILLA, arete:'', peso:0, edad:0, raza:'Cruza', sexo:'Hembra', estado:'ok', actividad:0, bateria:100, notas:'', lat:26.9887, lng:-102.0723 }
 ];
 let cercas = [];
+// 🆕 2026-10-07 (D2): sincronía de las cercas con el servidor. `pedida` numera cada GET del sondeo;
+//  `aplicada` es la última respuesta que se usó; `barrera` se pone al terminar un cambio propio
+//  (guardar, borrar, apagar, crear): toda respuesta pedida antes de ella trae las cercas como
+//  estaban y se tira. `borradas`: ids que este tablero borró (no regresan). Ver fusionarCercas.
+let cercasSync = cercasSyncInicial();
 let selectedLote = null;
 let editingAnimalId = null;
 let editingLoteId = null;
@@ -1493,39 +1568,103 @@ function renderAnimales() {
   ajustarEtiquetasArete();
 }
 
+// 🆕 2026-10-07 (D3): se pinta POR DIFERENCIAS. Antes cada sondeo de 5 s quitaba y volvía a poner
+//  todas las cercas (cerraba su ventanita abierta y, con los vértices ahora siempre visibles, serían
+//  cientos de capas nuevas cada 5 s). Ahora una cerca solo se repinta si cambió algo que se ve
+//  (firmaCerca). Los vértices van en un lienzo (canvas) compartido y no reciben toques: el toque lo
+//  resuelve objetivoBajoPuntero por distancia. La cerca desbloqueada no se pinta aquí: la pinta
+//  pintarEdicionCerca con sus puntos arrastrables.
 function renderCercas() {
-  Object.values(cercaLayers).forEach(l => map.removeLayer(l));
-  cercaLayers = {};
+  asegurarLienzoVertices();
+  const ahora = Date.now();
+  const vivas = new Set();
+  const editId = cercaDesbloqueada ? cercaDesbloqueada.id : null;
   cercas.forEach(c => {
-    const activa = c.activa !== false;
-    const esSimbolica = c.tipo === 'simbolica';
-    const latlngs = c.poligono.map(p => [p.lat, p.lng]);
-    const poly = L.polygon(latlngs, {
-      color: esSimbolica ? '#9ca3af' : safeColor(c.color),
-      fillColor: safeColor(c.color),
-      fillOpacity: esSimbolica ? 0 : (activa ? 0.15 : 0.04),
-      weight: 2,
-      opacity: activa ? 1 : 0.4,
-      dashArray: esSimbolica ? '1 5' : (!activa ? '4 8' : (c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null))
-    }).addTo(map);
-    const cat = catCerca(c.categoria);
-    let popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · ${esc(c.tipo)}${activa ? '' : ' · inactiva'}`
-              + `<br>Área: <b>${textoArea(areaPoligonoM2(c.poligono))}</b>`;
-    if (esSimbolica) popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · solo referencia visual`;
-    if (c.expiraEn) {
-      const ms = c.expiraEn - Date.now();
-      const h = Math.max(0, Math.floor(ms/3600000));
-      popup += `<br>Expira en ${h}h`;
+    const k = String(c.id);
+    vivas.add(k);
+    const oculta = editId != null && Number(c.id) === editId;
+    const firma = firmaCerca(c, ahora) + (oculta ? '|oculta' : '');
+    const prev = cercaLayers[k];
+    if (prev && prev.firma === firma) return;
+    if (oculta) {
+      // Revisión adversarial T1 (2026-10-07): la capa de la cerca que se desbloquea NO sale del DOM. El
+      //  dedo que mantuvo el vértice pudo caer en su relleno: con eventos táctiles, touchmove/touchend
+      //  siguen yendo a ESE nodo, y si ya no está en la página no llegan a document, donde Leaflet
+      //  escucha el fin del arrastre del mapa (se quedaba «arrastrando» y el siguiente intento de mover
+      //  un punto movía el mapa). Se esconde (sin trazo, sin relleno y sin eventos) y se quita al cerrar.
+      esconderCapaCerca(prev);
+      cercaLayers[k] = { firma, poly: prev ? prev.poly : null, puntos: null };
+      return;
     }
-    poly.bindPopup(popup);
-    cercaLayers[c.id] = poly;
+    if (prev) quitarCapasCerca(prev);
+    cercaLayers[k] = pintarCerca(c, firma);
   });
+  Object.keys(cercaLayers).forEach(k => {
+    if (!vivas.has(k)) { quitarCapasCerca(cercaLayers[k]); delete cercaLayers[k]; }
+  });
+  if (cercaDesbloqueada && cercaDesbloqueada.capa) cercaDesbloqueada.capa.bringToFront();
+}
+
+let lienzoVertices = null;   // un solo canvas para los vértices de TODAS las cercas
+function asegurarLienzoVertices() {
+  if (lienzoVertices) return;
+  const panel = map.createPane('verticesCerca');
+  panel.style.zIndex = 450;            // encima de los polígonos (400), debajo de los marcadores (600)
+  panel.style.pointerEvents = 'none';
+  lienzoVertices = L.canvas({ pane: 'verticesCerca', padding: 0.3 });
+}
+
+function quitarCapasCerca(l) {
+  if (l && l.poly) map.removeLayer(l.poly);
+  if (l && l.puntos) map.removeLayer(l.puntos);
+}
+function esconderCapaCerca(l) {   // ver T1 en renderCercas
+  if (!l) return;
+  if (l.puntos) { map.removeLayer(l.puntos); l.puntos = null; }   // en el lienzo: no es un nodo del DOM
+  if (!l.poly) return;
+  if (l.poly.closePopup) l.poly.closePopup();
+  l.poly.setStyle({ opacity: 0, fillOpacity: 0 });
+  const el = l.poly.getElement ? l.poly.getElement() : null;
+  if (el) el.style.pointerEvents = 'none';   // con opacidad 0 la ruta SVG aún recibiría toques
+}
+
+function pintarCerca(c, firma) {
+  const activa = c.activa !== false;
+  const esSimbolica = c.tipo === 'simbolica';
+  const latlngs = c.poligono.map(p => [p.lat, p.lng]);
+  const poly = L.polygon(latlngs, {
+    color: esSimbolica ? '#9ca3af' : safeColor(c.color),
+    fillColor: safeColor(c.color),
+    fillOpacity: esSimbolica ? 0 : (activa ? 0.15 : 0.04),
+    weight: 2,
+    opacity: activa ? 1 : 0.4,
+    dashArray: esSimbolica ? '1 5' : (!activa ? '4 8' : (c.tipo === 'temporal' ? '8 6' : c.tipo === 'exclusion' ? '2 6' : null))
+  }).addTo(map);
+  const cat = catCerca(c.categoria);
+  let popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · ${esc(c.tipo)}${activa ? '' : ' · inactiva'}`
+            + `<br>Área: <b>${textoArea(areaPoligonoM2(c.poligono))}</b>`;
+  if (esSimbolica) popup = `<b>${cat.icono} ${esc(c.nombre)}</b><br>${esc(cat.label)} · solo referencia visual`;
+  if (c.expiraEn) {
+    const ms = c.expiraEn - Date.now();
+    const h = Math.max(0, Math.floor(ms/3600000));
+    popup += `<br>Expira en ${h}h`;
+  }
+  if (c.delServidor) popup += `<br><span style="color:#6b7280; font-size:11px;">Mantén presionado un punto 3 s para editar la forma</span>`;
+  poly.bindPopup(popup);
+  // Vértices siempre visibles: chicos, sin eventos, en el lienzo compartido.
+  const puntos = L.layerGroup(c.poligono.map(p => L.circleMarker([p.lat, p.lng], {
+    renderer: lienzoVertices, interactive: false, radius: 3.5, weight: 1.5,
+    color: '#ffffff', opacity: activa ? 0.95 : 0.45,
+    fillColor: esSimbolica ? '#9ca3af' : safeColor(c.color), fillOpacity: activa ? 1 : 0.45
+  }))).addTo(map);
+  return { firma, poly, puntos };
 }
 
 // ════════════════════════════════════════════════════════════
 //  DIBUJO DE CERCAS
 // ════════════════════════════════════════════════════════════
 function toggleDraw() {
+  if (!drawingMode && cercaDesbloqueada) { avisoMapa(textoTerminaEdicionPrimero()); return; }
   drawingMode = !drawingMode;
   const btn = document.getElementById('btn-draw-toggle');
   if (drawingMode) {
@@ -1670,7 +1809,7 @@ function cancelarNuevaCerca() {
   // Si estaba dibujando, apagar el modo
   drawingMode = false;
   map.getContainer().style.cursor = '';
-  if (map.doubleClickZoom) map.doubleClickZoom.enable();
+  if (map.doubleClickZoom && !cercaDesbloqueada) map.doubleClickZoom.enable();
   // Limpiar dibujo temporal
   tempMarkers.forEach(m => map.removeLayer(m));
   tempMarkers = [];
@@ -1727,6 +1866,9 @@ function cercaCabeOAvisa(poligono, warnDist, nombre) {
 
 async function enviarCercaAlServidor(cerca) {
   if (!cercaCabeOAvisa(cerca.poligono, cerca.warn_dist_m, cerca.nombre)) return;
+  // 🆕 2026-10-07 (D2): mientras el POST va en camino, el sondeo no la quita del mapa (fusionarCercas
+  //  conserva las `_pendiente`). Si falla, se comporta como antes: se ve hasta el siguiente sondeo.
+  cerca._pendiente = true;
   const payload = {
     nombre: cerca.nombre, tipo: cerca.tipo, categoria: cerca.categoria || 'potrero',
     poligono: cerca.poligono, warn_dist_m: cerca.warn_dist_m,
@@ -1739,18 +1881,32 @@ async function enviarCercaAlServidor(cerca) {
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       console.log('✅ Cerca guardada en servidor:', data);
+      cerca._pendiente = false;
+      // La copia local se cambia por la fila del servidor (id real y versión) y se pone la barrera:
+      //  un sondeo pedido antes del POST no la trae y no debe borrarla del mapa.
+      if (data && data.valla) {
+        const nueva = filaACerca(data.valla);
+        const i = cercas.indexOf(cerca), ya = cercas.findIndex(c => Number(c.id) === nueva.id);
+        if (ya >= 0) { cercas[ya] = nueva; if (i >= 0 && i !== ya) cercas.splice(i, 1); }   // un sondeo ya la trajo
+        else if (i >= 0) cercas[i] = nueva;
+        else cercas.unshift(nueva);
+      }
+      cercasSync.barrera = cercasSync.pedida;
+      renderCercas(); renderCercasList();
       alert('✅ Cerca "' + cerca.nombre + '" guardada en el servidor');
       // Recargar las cercas del servidor para tener el ID real (necesario para borrar)
       actualizarDesdeServidor();
     } else {
+      cerca._pendiente = false;
       const err = await res.text();
       console.error('❌ Servidor respondió', res.status, err);
       alert('⚠ El servidor rechazó la cerca (' + res.status + ').\n' + err +
             '\n\nLa cerca se ve en el mapa pero NO se guardó en el servidor.');
     }
   } catch(e) {
+    cerca._pendiente = false;
     console.error('❌ Error de conexión:', e);
     alert('⚠ No se pudo conectar al servidor.\n' + e.message +
           '\n\nVerifica que el servidor de Render esté despierto (puede tardar 30s).');
@@ -2364,17 +2520,9 @@ function cancelarModosMapa() {
   if (typeof currentPolyPts !== 'undefined') currentPolyPts = [];
   if (typeof colocandoAguaje !== 'undefined' && colocandoAguaje) toggleColocarAguaje();
   if (typeof colocandoInfra !== 'undefined' && colocandoInfra) toggleColocarInfra();
-  if (typeof editPolyLayer !== 'undefined' && editPolyLayer) { try { map.removeLayer(editPolyLayer); } catch(e){} editPolyLayer = null; }
-  if (typeof vertexMarkers !== 'undefined' && vertexMarkers.length) {
-    vertexMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
-    vertexMarkers = [];
-  }
-  if (typeof moveHandle !== 'undefined' && moveHandle) { try { map.removeLayer(moveHandle); } catch(e){} moveHandle = null; }
-  if (typeof editandoForma !== 'undefined' && editandoForma) {
-    editandoForma = false;
-    const b = document.getElementById('ec-shape-btn');
-    if (b) { b.textContent = '✎ Editar forma (arrastrar puntos)'; b.classList.remove('btn-primary'); }
-  }
+  // 🆕 2026-10-07 (D3): la cerca DESBLOQUEADA no se toca al cambiar de pestaña. Vive en el mapa y
+  //  solo la terminan Guardar (o doble toque en el mapa) y Cancelar (o Esc): la forma editada no se
+  //  pierde por mirar otra sección.
 }
 
 function showTab(t) {
@@ -2682,28 +2830,34 @@ async function actualizarDesdeServidor() {
   } catch(e) { mostrarBannerConexion(false); }
 
   // 2. Cercas guardadas en el servidor
+  // ⛔ CORREGIDO 2026-10-07: este sondeo reemplazaba `cercas` cada 5 s aunque hubiera una cerca en
+  //  edición: se llevaba la forma ya editada, Guardar mandaba el polígono VIEJO y salía «✅
+  //  actualizada» con la cerca donde estaba. Ahora (D2, «no importa el momento») la respuesta se
+  //  FUSIONA con lo local (fusionarCercas) y:
+  //   · nunca toca la cerca desbloqueada (en edición) ni la que se está guardando;
+  //   · se tira si salió antes de otra que ya se aplicó, o antes de que terminara un cambio propio
+  //     (guardar, borrar, apagar, crear): respuestaDeCercasVigente, con número de secuencia;
+  //   · por cerca, una fila más vieja (`updated`) que la que ya hay no la pisa: cubre la respuesta
+  //     de la caché del service worker cuando la red falla, que puede llegar DESPUÉS de guardar;
+  //   · una cerca que este tablero borró no regresa aunque una respuesta vieja la traiga.
   try {
+    const seq = ++cercasSync.pedida;
     const res = await authFetch(`${API_BASE}/geovallas?todas=true`);
     if (res.ok) {
       const data = await res.json();
-      cercas = data.map(g => ({
-        id: g.id,
-        nombre: g.nombre,
-        tipo: g.tipo,
-        categoria: g.categoria || 'potrero',
-        color: g.color || '#4ade80',
-        warn_dist_m: g.warn_dist_m,
-        activa: g.activa !== false,
-        poligono: typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono,
-        collares: typeof g.collares === 'string' ? JSON.parse(g.collares) : (g.collares || []),
-        lote: g.lote ?? null,
-        expiraEn: g.expira_en ? new Date(g.expira_en).getTime() : null,
-        delServidor: true
-      }));
-      renderCercas();
-      renderCercasList();
-      // Primer encuadre: abrir en TUS cercas/collares, no en el punto por defecto (una sola vez).
-      if (!window._mapaEncuadrado && encuadrarTodo()) window._mapaEncuadrado = true;
+      if (Array.isArray(data) && respuestaDeCercasVigente(seq, cercasSync)) {
+        cercasSync.aplicada = seq;
+        const r = fusionarCercas(cercas, data, { protegidas: idsCercasProtegidas(), borradas: cercasSync.borradas });
+        cercas = r.cercas;
+        if (cercaDesbloqueada && r.remotasEnEdicion.includes(cercaDesbloqueada.id) && !cercaDesbloqueada.cambioRemoto) {
+          cercaDesbloqueada.cambioRemoto = true;   // otro teléfono la cambió mientras la editas: se avisa
+          actualizarBarraCerca();
+        }
+        renderCercas();
+        renderCercasListSiCambio();
+        // Primer encuadre: abrir en TUS cercas/collares, no en el punto por defecto (una sola vez).
+        if (!window._mapaEncuadrado && encuadrarTodo()) window._mapaEncuadrado = true;
+      }
     }
   } catch(e) { /* sin conexión */ }
 
@@ -2951,43 +3105,69 @@ async function terminarArreo() {
 }
 
 // Borrar una cerca (en el servidor y en el mapa)
+// ⛔ CORREGIDO 2026-10-07: el servidor solo la APAGABA y el sondeo (que pide también las
+//  apagadas) la regresaba a los 5 s con el mismo nombre. Desde D1 el servidor la BORRA de verdad
+//  (guarda antes una instantánea en su bitácora) y se niega con 409 si algún animal depende de ella
+//  o si una rotación o un arreo en curso la usan; aquí se dice por qué y cuántos. Para dejar de
+//  usarla sin borrarla está el interruptor Activa/Inactiva.
 async function borrarCerca(id) {
-  if (!confirm('¿Borrar esta cerca? Los collares dejarán de usarla.')) return;
+  id = Number(id);
+  const c = cercas.find(x => Number(x.id) === id);
+  if (guardandoCercaId != null) { avisoMapa('Espera a que termine de guardarse la cerca.'); return; }
+  const nombre = c ? c.nombre : 'la cerca';
+  if (!confirm('¿Borrar «' + nombre + '» para siempre?\n\n' +
+               'Desaparece del tablero y el gateway deja de mandarla. El servidor guarda una copia ' +
+               'en su bitácora. Si algún animal la tiene como su cerca, o si algún animal o collar (aunque no ' +
+               'tenga animal registrado) está adentro, el servidor no la deja borrar y te dice cuántos son.\n\n' +
+               'Para dejar de usarla sin borrarla, apágala con el interruptor.')) return;
   try {
     const res = await authFetch(`${API_BASE}/geovallas/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      cercas = cercas.filter(c => c.id !== id);
+    const d = await res.json().catch(() => ({}));
+    if (res.ok || res.status === 404) {   // 404: ya estaba borrada (otro teléfono)
+      cercasSync.borradas.add(id);          // ni una respuesta vieja la regresa
+      cercasSync.barrera = cercasSync.pedida;
+      if (cercaDesbloqueada && cercaDesbloqueada.id === id) cerrarDesbloqueo();
+      cercas = cercas.filter(x => Number(x.id) !== id);
       renderCercas();
       renderCercasList();
+      avisoMapa('🗑 «' + nombre + '» borrada' + (d && d.liberados ? ` (${d.liberados} animal(es) sin collar quedaron sin cerca)` : ''));
     } else {
-      alert('No se pudo borrar la cerca en el servidor.');
+      alert('⚠ ' + textoErrorCerca('borrar «' + nombre + '»', res.status, d));
     }
   } catch(e) {
-    alert('Error de conexión al borrar.');
+    alert('Error de conexión al borrar: la cerca NO se borró.');
   }
 }
 
 // Activar o desactivar una cerca (sin borrarla). Útil para potreros
 // que se rotan: dibujas todos una vez y vas activando el que toca.
+// 🆕 2026-10-07 (D1): apagar una cerca de la que dependen animales ya no los suelta: el servidor
+//  responde 409 diciendo cuántos, y aquí se muestra. Con 200 la cerca se toma de la respuesta.
+// 🆕 Revisión adversarial (2026-10-07): S2, encenderla con adoptados FUERA de ella pide confirmar
+//  (pedirPatchCerca); T4, mientras el cambio va en camino la cerca queda «ocupada»: no se desbloquea ni se
+//  guarda su forma, y una respuesta más vieja que la cerca local no la pisa (aplicarCercaDelServidor).
 async function toggleCercaActiva(id) {
-  const c = cercas.find(x => x.id === id);
+  id = Number(id);
+  const c = cercas.find(x => Number(x.id) === id);
   if (!c) return;
+  if (guardandoCercaId != null || cercasEnCamino.has(id)) { avisoMapa('Espera a que termine de guardarse la cerca.'); return; }
   const nuevoEstado = !(c.activa !== false);
+  const que = (nuevoEstado ? 'encender' : 'apagar') + ' «' + c.nombre + '»';
+  cercasEnCamino.add(id);
   try {
-    const res = await authFetch(`${API_BASE}/geovallas/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activa: nuevoEstado })
-    });
-    if (res.ok) {
-      c.activa = nuevoEstado;
+    const { res, datos, cancelado } = await pedirPatchCerca(id, { activa: nuevoEstado }, que);
+    if (!res) alert('Error de conexión: la cerca no cambió.');
+    else if (res.ok) {
+      aplicarCercaDelServidor(datos.valla, c, { activa: nuevoEstado });
+      cercasSync.barrera = cercasSync.pedida;
       renderCercas();
       renderCercasList();
-    } else {
-      alert('No se pudo cambiar el estado de la cerca.');
+    } else if (!cancelado) {
+      alert('⚠ ' + textoErrorCerca(que, res.status, datos));
     }
-  } catch(e) {
-    alert('Error de conexión.');
+  } finally {
+    cercasEnCamino.delete(id);
+    actualizarBarraCerca();
   }
 }
 
@@ -3139,6 +3319,7 @@ async function editarAguaje(id) {
 }
 
 function toggleColocarAguaje() {
+  if (!colocandoAguaje && cercaDesbloqueada) { avisoMapa(textoTerminaEdicionPrimero()); return; }
   colocandoAguaje = !colocandoAguaje;
   const btn = document.getElementById('btn-agua-toggle');
   const hint = document.getElementById('agua-hint');
@@ -3290,6 +3471,7 @@ function toggleFiltroInfra(t) {
 }
 
 function toggleColocarInfra() {
+  if (!colocandoInfra && cercaDesbloqueada) { avisoMapa(textoTerminaEdicionPrimero()); return; }
   colocandoInfra = !colocandoInfra;
   const btn = document.getElementById('btn-infra-toggle');
   const hint = document.getElementById('infra-hint');
@@ -3462,6 +3644,7 @@ async function terminarRotacion() {
   if (!res.ok) { alert(d.error || ('No se pudo apagar: ' + res.status)); await cargarRotacion(); return; }
   // el servidor ya apagó la cerca origen: reflejarlo en memoria sin esperar la siguiente carga
   const co = cercas.find(c => c.id === rotacionEstado.origen_id); if (co) co.activa = false;
+  cercasSync.barrera = cercasSync.pedida;   // un sondeo que salió antes la traería encendida
   rotacionEstado = null;
   renderCercas(); renderCercasList(); renderAnimalesList(); await cargarRotacion();
 }
@@ -3475,12 +3658,13 @@ async function cancelarRotacion() {
 function renderCercasList() {
   const cont = document.getElementById('cercas-list');
   if (!cont) return;
+  firmaListaCercas = firmaDeListaCercas();
   if (!cercas.length) {
     cont.innerHTML = '<p style="font-size:13px; color:var(--text-dim); text-align:center; padding:16px 0;">No hay cercas guardadas. Toca "+ Nueva cerca" para crear una.</p>';
     return;
   }
   cont.innerHTML = cercas.map(c => {
-    const tipoLabel = c.tipo === 'temporal' ? 'Temporal' : c.tipo === 'exclusion' ? 'Exclusión' : 'Permanente';
+    const tipoLabel = c.tipo === 'temporal' ? 'Temporal' : c.tipo === 'exclusion' ? 'Exclusión' : c.tipo === 'simbolica' ? 'Simbólica' : 'Permanente';
     let timer = '';
     if (c.expiraEn) {
       const ms = c.expiraEn - Date.now();
@@ -3511,6 +3695,15 @@ function renderCercasList() {
   }).join('');
 }
 
+// 🆕 2026-10-07: la lista se rehace solo si cambió algo que se ve (antes, cada 5 s aunque nada
+//  cambiara, y el toque a medio camino sobre un botón de la lista se podía perder).
+let firmaListaCercas = '';
+function firmaDeListaCercas() { const ahora = Date.now(); return cercas.map(c => firmaCerca(c, ahora)).join('\n'); }
+function renderCercasListSiCambio() {
+  if (firmaDeListaCercas() === firmaListaCercas) return;
+  renderCercasList();
+}
+
 // Centrar el mapa en una cerca al tocarla en la lista
 function irACerca(poligono) {
   if (!poligono || !poligono.length) return;
@@ -3519,16 +3712,870 @@ function irACerca(poligono) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  EDICIÓN DE CERCAS — datos + arrastre de vértices
+//  CERCAS: EDICIÓN SOBRE EL MAPA Y GUARDADO A PRUEBA DE TIEMPOS (2026-10-07, D2 y D3)
 // ════════════════════════════════════════════════════════════
-let editingCercaId = null;
-let editPolyLayer = null;     // el polígono editable en el mapa
-let editandoForma = false;
+//  Lo pidió Gilberto: «no importa el momento: si cambio el polígono en el tablero, se tiene que
+//  mantener»; los vértices de cada cerca siempre a la vista; y editar SIN el botón: mantener
+//  presionado un vértice 3 s desbloquea su cerca, se arrastran los puntos, y doble toque en el mapa
+//  (o «Guardar») guarda. Esc o «Cancelar» descarta.
+//  Arriba va la lógica PURA (sin Leaflet ni DOM), que tools/test_tablero_cercas.js corre en node con
+//  tiempos exactos. Abajo, el pegamento con Leaflet y la pantalla.
 
+// ⟦LOGICA-PURA-CERCAS⟧ inicio
+const GESTO_CERCA = {
+  msMantener: 3000,       // mantener quieto un vértice este tiempo desbloquea su cerca
+  toleranciaPx: 10,       // moverse más que esto antes de tiempo cancela, y el mapa se mueve normal
+  msToque: 350,           // un toque dura menos que esto…
+  msEntreToques: 400,     // …el segundo empieza antes de esto tras soltar el primero…
+  distEntreToquesPx: 30,  // …y cae a menos de esto del primero: doble toque
+  radioPx: { mouse: 10, pen: 14, touch: 22 },   // qué tan cerca de un vértice cuenta como «sobre él»
+  empatePx: 3,            // vértices a la misma distancia (± esto): esquina compartida
+};
+
+// ── El gesto «mantener un vértice» ──
+// Fases: libre → manteniendo (un dedo quieto sobre un vértice de una cerca bloqueada; corre el reloj)
+//        → arrastrando (ya se desbloqueó y el MISMO dedo sigue abajo: moverlo arrastra ese vértice).
+// ev: { tipo:'bajar', t, x, y, puntero, objetivo:{cercaId, idx}|null } · { tipo:'mover'|'subir', t, x, y, puntero }
+//     { tipo:'tic', t } (el reloj) · { tipo:'cancelar' } (otro dedo, el sistema canceló, el mapa se movió)
+// Devuelve { est, accion, … }. accion: null | 'empezar' | 'esperar' (msFaltan) | 'cancelar'
+//   | 'desbloquear' (cercaId, idx, sigueAbajo; y x, y si ese mismo evento ya mueve el vértice)
+//   | 'arrastrar' (x, y: dónde va el VÉRTICE, no el dedo) | 'soltar'.
+// El tiempo manda: si ya pasaron msMantener, cuenta aunque el reloj del navegador llegue tarde.
+// objetivo.x/.y = el vértice en pantalla. Revisión adversarial T2 (2026-10-07): antes el vértice
+//  brincaba hasta el dedo (que cae hasta a 22 px) y un temblor de 1 px al soltar lo movía hasta ~90 m
+//  sin que se viera (el dedo lo tapa). Ahora el vértice se mueve LO QUE el dedo se mueva desde donde
+//  estaba al desbloquear, y solo cuando se aleja más de toleranciaPx: mantener 3 s y soltar con un
+//  temblor no cambia la forma.
+function gestoInicial() { return { fase: 'libre' }; }
+function gestoVertice(est, ev, opc = GESTO_CERCA) {
+  const libre = gestoInicial();
+  if (ev.tipo === 'cancelar')
+    return { est: libre, accion: est.fase === 'manteniendo' ? 'cancelar' : est.fase === 'arrastrando' ? 'soltar' : null };
+  if (est.fase === 'libre') {
+    if (ev.tipo === 'bajar' && ev.objetivo)
+      return { est: { fase: 'manteniendo', puntero: ev.puntero, t0: ev.t, x0: ev.x, y0: ev.y, xu: ev.x, yu: ev.y,
+                      vx: ev.objetivo.x ?? ev.x, vy: ev.objetivo.y ?? ev.y,
+                      cercaId: ev.objetivo.cercaId, idx: ev.objetivo.idx }, accion: 'empezar' };
+    return { est, accion: null };
+  }
+  if (ev.tipo === 'bajar')   // otro dedo (pellizco) u otro botón: ya no es este gesto
+    return { est: libre, accion: est.fase === 'manteniendo' ? 'cancelar' : 'soltar' };
+  if (ev.puntero !== undefined && ev.puntero !== est.puntero) return { est, accion: null };
+  if (est.fase === 'manteniendo') {
+    if (ev.t - est.t0 >= opc.msMantener) {
+      const r = { est: libre, accion: 'desbloquear', cercaId: est.cercaId, idx: est.idx, sigueAbajo: ev.tipo !== 'subir' };
+      if (!r.sigueAbajo) return r;
+      // El arrastre parte de donde estaba el dedo al desbloquear (el último punto conocido).
+      r.est = { ...est, fase: 'arrastrando', xs: est.xu, ys: est.yu, movido: false };
+      if (ev.tipo === 'mover') {
+        const m = arrastreDelVertice(r.est, ev, opc);
+        r.est = m.est;
+        if (m.x != null) { r.x = m.x; r.y = m.y; }
+      }
+      return r;
+    }
+    if (ev.tipo === 'tic') return { est, accion: 'esperar', msFaltan: opc.msMantener - (ev.t - est.t0) };
+    if (ev.tipo === 'subir') return { est: libre, accion: 'cancelar' };
+    if (ev.tipo === 'mover') {
+      if (Math.hypot(ev.x - est.x0, ev.y - est.y0) > opc.toleranciaPx) return { est: libre, accion: 'cancelar' };
+      return { est: { ...est, xu: ev.x, yu: ev.y }, accion: null };
+    }
+    return { est, accion: null };
+  }
+  if (ev.tipo === 'mover') {
+    const m = arrastreDelVertice(est, ev, opc);
+    return m.x == null ? { est: m.est, accion: null } : { est: m.est, accion: 'arrastrar', x: m.x, y: m.y };
+  }
+  if (ev.tipo === 'subir') return { est: libre, accion: 'soltar' };
+  return { est, accion: null };
+}
+// Ya desbloqueada y con el mismo dedo abajo: ¿a dónde va el vértice? (x null = todavía no se mueve)
+function arrastreDelVertice(est, ev, opc = GESTO_CERCA) {
+  if (!est.movido && Math.hypot(ev.x - est.xs, ev.y - est.ys) <= opc.toleranciaPx) return { est, x: null };
+  return { est: est.movido ? est : { ...est, movido: true }, x: est.vx + (ev.x - est.xs), y: est.vy + (ev.y - est.ys) };
+}
+
+// ── Doble toque (o doble clic) en el MAPA ──
+// ev: { tipo:'bajar', t, x, y, puntero, valido } · { tipo:'mover'|'subir', t, x, y, puntero } · { tipo:'cancelar' }
+// valido = false si el dedo cayó sobre un punto, una manija, un botón o una ventanita: eso no es «el mapa».
+// Devuelve { est, doble }.
+function toquesInicial() { return { abajo: null, ultimo: null }; }
+function toquesMapa(est, ev, opc = GESTO_CERCA) {
+  const nada = toquesInicial();
+  if (ev.tipo === 'cancelar') return { est: nada, doble: false };
+  if (ev.tipo === 'bajar') {
+    if (est.abajo || !ev.valido) return { est: nada, doble: false };   // segundo dedo, o no fue en el mapa
+    return { est: { ...est, abajo: { t: ev.t, x: ev.x, y: ev.y, puntero: ev.puntero, movido: false } }, doble: false };
+  }
+  const a = est.abajo;
+  if (!a || (ev.puntero !== undefined && ev.puntero !== a.puntero)) return { est, doble: false };
+  if (ev.tipo === 'mover') {
+    if (!a.movido && Math.hypot(ev.x - a.x, ev.y - a.y) > opc.toleranciaPx)
+      return { est: { ...est, abajo: { ...a, movido: true } }, doble: false };
+    return { est, doble: false };
+  }
+  if (ev.tipo !== 'subir') return { est, doble: false };
+  if (a.movido || ev.t - a.t > opc.msToque) return { est: nada, doble: false };   // arrastre o pulsación larga
+  const u = est.ultimo;
+  if (u && a.t - u.t <= opc.msEntreToques && Math.hypot(a.x - u.x, a.y - u.y) <= opc.distEntreToquesPx)
+    return { est: nada, doble: true };
+  return { est: { abajo: null, ultimo: { t: ev.t, x: a.x, y: a.y } }, doble: false };
+}
+
+// ── ¿Qué vértice quedó bajo el dedo? ──
+// puntos: [{ cercaId, idx, x, y, area }] en pixeles de pantalla. null si ninguno está a menos de `radio`.
+// Esquina compartida (dos potreros que se tocan): entre los que empatan en distancia gana la cerca
+// más chica; y si `previo` (lo elegido hace poco en ese mismo lugar) está en el empate, toca la
+// siguiente, para que un segundo intento en esa esquina desbloquee la otra cerca.
+function elegirVertice(puntos, x, y, radio, previo, opc = GESTO_CERCA) {
+  const cand = [];
+  for (const p of puntos || []) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d <= radio) cand.push({ ...p, d });
+  }
+  if (!cand.length) return null;
+  cand.sort((a, b) => a.d - b.d);
+  const empate = [];
+  for (const c of cand) {
+    if (c.d > cand[0].d + opc.empatePx) break;
+    if (!empate.some(e => e.cercaId === c.cercaId)) empate.push(c);
+  }
+  empate.sort((a, b) => (a.area || 0) - (b.area || 0) || a.cercaId - b.cercaId);
+  let i = 0;
+  if (previo && empate.length > 1) {
+    const j = empate.findIndex(e => e.cercaId === previo.cercaId);
+    if (j >= 0) i = (j + 1) % empate.length;
+  }
+  const e = empate[i];
+  return { cercaId: e.cercaId, idx: e.idx, x: e.x, y: e.y, empatadas: empate.length };
+}
+
+// ── Un solo polígono desbloqueado a la vez ──
+// ctx: { desbloqueadaId, desbloqueadaNombre, guardandoId, enCamino, editorId, modo }. Devuelve { ok, motivo, texto }.
+// enCamino: ids con el interruptor Activa/Inactiva en camino (revisión T4): su respuesta llega después y
+//  no se debe mezclar con una forma editada mientras tanto.
+function puedeDesbloquear(ctx, id) {
+  id = Number(id);
+  if (ctx.guardandoId != null) return { ok: false, motivo: 'guardando', texto: 'Espera: se está guardando una cerca.' };
+  if ((ctx.enCamino || []).some(x => Number(x) === id))
+    return { ok: false, motivo: 'en_camino', texto: 'Espera: todavía se está guardando el cambio de Activa/Inactiva de esta cerca.' };
+  if (ctx.desbloqueadaId != null) {
+    if (Number(ctx.desbloqueadaId) === id) return { ok: true, yaEstaba: true };
+    return { ok: false, motivo: 'otra',
+             texto: `Ya estás editando «${ctx.desbloqueadaNombre || 'otra cerca'}». Guárdala (doble toque en el mapa o «Guardar») o cancélala antes de editar otra.` };
+  }
+  if (ctx.editorId != null && Number(ctx.editorId) !== id)
+    return { ok: false, motivo: 'editor', texto: 'Tienes otra cerca abierta en «Editar cerca». Guárdala o cancélala primero.' };
+  if (ctx.modo) return { ok: false, motivo: 'modo', texto: `Primero termina de ${ctx.modo}.` };
+  return { ok: true };
+}
+
+// ── Formas: arreglos de { lat, lng } ──
+function copiarForma(p) { return (p || []).map(v => ({ lat: Number(v.lat), lng: Number(v.lng) })); }
+function mismaForma(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((v, i) => Math.abs(v.lat - b[i].lat) < 1e-9 && Math.abs(v.lng - b[i].lng) < 1e-9);
+}
+function insertarVertice(forma, i, p) {
+  const f = copiarForma(forma);
+  f.splice(i, 0, { lat: Number(p.lat), lng: Number(p.lng) });
+  return f;
+}
+function quitarVertice(forma, i) {   // null si quedaría con menos de 3 esquinas
+  if (!forma || forma.length <= 3) return null;
+  const f = copiarForma(forma);
+  f.splice(i, 1);
+  return f;
+}
+// El punto medio de cada lado; `i` es dónde se inserta la esquina nueva.
+function puntosMedios(forma) {
+  const n = (forma || []).length;
+  return (forma || []).map((a, k) => {
+    const b = forma[(k + 1) % n];
+    return { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2, i: k + 1 };
+  });
+}
+function trasladarForma(forma, dLat, dLng) { return copiarForma(forma).map(v => ({ lat: v.lat + dLat, lng: v.lng + dLng })); }
+function centroDeForma(forma) {   // centro de la caja: ahí va la manija ✥
+  let s = Infinity, n = -Infinity, o = Infinity, e = -Infinity;
+  for (const p of forma || []) { s = Math.min(s, p.lat); n = Math.max(n, p.lat); o = Math.min(o, p.lng); e = Math.max(e, p.lng); }
+  return { lat: (s + n) / 2, lng: (o + e) / 2 };
+}
+// Mismo trazo de rayos que backend/adopcion.js (puntoEnPoligono): el tablero tiene que ver lo que ve el servidor.
+function puntoEnCerca(lat, lng, poly) {
+  if (!Array.isArray(poly) || poly.length < 3) return false;
+  let dentro = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const yi = poly[i].lat, xi = poly[i].lng, yj = poly[j].lat, xj = poly[j].lng;
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) dentro = !dentro;
+  }
+  return dentro;
+}
+
+// ── Antes de guardar una forma: ¿deja FUERA a animales que esta cerca tiene adoptados? ──
+// Cuenta solo a los adoptados (cerca_id) con collar y posición real (ya reportaron). yaFuera: de esos,
+// los que ya estaban fuera con la forma vieja (la nueva no los saca, pero tampoco los regresa).
+function adoptadosQueQuedanFuera(cerca, formaNueva, animales) {
+  const fuera = [], yaFuera = [];
+  if (!cerca) return { fuera, yaFuera };
+  for (const a of animales || []) {
+    if (!a || !a.collar || a.cerca_id == null || Number(a.cerca_id) !== Number(cerca.id)) continue;
+    const lat = Number(a.lat), lng = Number(a.lng);
+    if (!a.ultimaConexion || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (puntoEnCerca(lat, lng, formaNueva)) continue;
+    fuera.push(a);
+    if (!puntoEnCerca(lat, lng, cerca.poligono)) yaFuera.push(a);
+  }
+  return { fuera, yaFuera };
+}
+function textoQuedanFuera(nombre, r) {
+  const n = r.fuera.length;
+  if (!n) return '';
+  const uno = n === 1;
+  const lista = r.fuera.slice(0, 8).map(a => '• ' + (a.nombre || a.collar)).join('\n') + (n > 8 ? `\n• y ${n - 8} más` : '');
+  const ya = r.yaFuera.length
+    ? `\n(${r.yaFuera.length === 1 ? '1 de ellos ya estaba' : r.yaFuera.length + ' de ellos ya estaban'} fuera con la forma de antes.)` : '';
+  return `Con la forma nueva, ${uno ? '1 animal adoptado' : n + ' animales adoptados'} por «${nombre}» ` +
+         `${uno ? 'queda' : 'quedan'} FUERA según su última posición:\n${lista}${ya}\n\n` +
+         `Su collar ${uno ? 'le dará' : 'les dará'} el aviso sonoro y, si no ${uno ? 'regresa' : 'regresan'}, el estímulo.\n\n` +
+         '¿Guardar la forma así?';
+}
+
+// ── Sincronía con el servidor (D2) ──
+function cercasSyncInicial() { return { pedida: 0, aplicada: 0, barrera: 0, borradas: new Set() }; }
+// ¿Se usa la respuesta del GET número `seq`? No si ya se aplicó otra pedida después (llegaron en
+// desorden), ni si se pidió antes de que terminara un cambio propio (trae las cercas como estaban).
+function respuestaDeCercasVigente(seq, s) { return seq > s.aplicada && seq > s.barrera; }
+// La versión de una cerca es su `updated` del servidor: lo sube cada cambio (PATCH, rotación, caducidad).
+function versionDeCerca(g) {
+  const t = g && g.updated ? Date.parse(g.updated) : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
+function filaACerca(g) {
+  return {
+    id: Number(g.id),
+    nombre: g.nombre,
+    tipo: g.tipo,
+    categoria: g.categoria || 'potrero',
+    color: g.color || '#4ade80',
+    warn_dist_m: g.warn_dist_m,
+    activa: g.activa !== false,
+    poligono: typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono,
+    collares: typeof g.collares === 'string' ? JSON.parse(g.collares) : (g.collares || []),
+    lote: g.lote ?? null,
+    expiraEn: g.expira_en ? new Date(g.expira_en).getTime() : null,
+    version: versionDeCerca(g),
+    delServidor: true
+  };
+}
+// Une lo que trajo el sondeo con lo que hay en pantalla.
+//  ctx.protegidas: ids en edición o guardándose: se quedan como están (aunque el servidor no las traiga).
+//  ctx.borradas:   ids que este tablero borró: no regresan aunque una respuesta vieja las traiga.
+//  Una fila más vieja (`updated`) que la cerca local no la pisa. Las locales `_pendiente` (POST en
+//  camino) se quedan. Lo demás que el servidor ya no trae, se va (lo borraron en otro teléfono).
+// Devuelve { cercas, remotasEnEdicion }: ids protegidas que cambiaron en el servidor (para avisar).
+function fusionarCercas(locales, filas, ctx = {}) {
+  const protegidas = ctx.protegidas || new Set(), borradas = ctx.borradas || new Set();
+  const porId = new Map((locales || []).map(c => [Number(c.id), c]));
+  const salida = [], vistas = new Set(), remotasEnEdicion = [];
+  for (const g of filas || []) {
+    const id = Number(g.id);
+    if (borradas.has(id) || vistas.has(id)) continue;
+    vistas.add(id);
+    const local = porId.get(id);
+    const vg = versionDeCerca(g);
+    if (local && protegidas.has(id)) {
+      salida.push(local);
+      if (vg > (local.version || 0)) remotasEnEdicion.push(id);
+      continue;
+    }
+    if (local && (local.version || 0) > vg) { salida.push(local); continue; }
+    salida.push(filaACerca(g));
+  }
+  for (const c of locales || []) {
+    const id = Number(c.id);
+    if (vistas.has(id) || borradas.has(id)) continue;
+    if (protegidas.has(id)) { salida.push(c); continue; }
+    // Recién dibujada con su POST en camino: se queda, salvo que el servidor ya la traiga (mismo
+    //  nombre y misma forma): entonces se ve una sola.
+    if (c._pendiente && !(filas || []).some(g => g.nombre === c.nombre &&
+        mismaForma(copiarForma(typeof g.poligono === 'string' ? JSON.parse(g.poligono) : g.poligono), copiarForma(c.poligono))))
+      salida.push(c);
+  }
+  return { cercas: salida, remotasEnEdicion };
+}
+// Lo que se VE de una cerca (mapa y lista): si no cambia, no se repinta.
+function firmaCerca(c, ahora) {
+  return JSON.stringify([c.id, c.nombre, c.tipo, c.categoria, c.color, c.activa !== false, c.poligono, c.warn_dist_m,
+    c.expiraEn ? Math.floor((c.expiraEn - ahora) / 3600000) : null, !!c.delServidor]);
+}
+
+// ── Lo que se le dice al ranchero cuando el servidor no aceptó un cambio de cerca ──
+// status 0 = sin conexión. cuerpo: el JSON de error ({ error, motivo, adoptados, adentro, animales }).
+// motivo 'confirmar' (revisión S2): no es un «no»: encenderla deja adoptados FUERA de ella; el que llama
+//  pregunta con este texto y, si el ranchero acepta, repite con confirmar_fuera:true.
+// sin_animal (revisión S1): un collar dado de alta sin animal registrado; se nombra por su device.
+function textoErrorCerca(queSeIntento, status, cuerpo) {
+  const c = cuerpo && typeof cuerpo === 'object' ? cuerpo : {};
+  if (!status) return `No se pudo ${queSeIntento}: no hay conexión con el servidor.`;
+  let t = c.error
+    ? (/^No se puede/.test(String(c.error)) || c.motivo === 'confirmar' ? String(c.error) : `No se pudo ${queSeIntento}: ${c.error}`)
+    : `No se pudo ${queSeIntento} (el servidor respondió ${status}).`;
+  const razon = { adentro: 'última posición adentro', fuera: 'última posición fuera', adoptado: 'adoptado' };
+  const lista = (Array.isArray(c.animales) ? c.animales : []).slice(0, 8)
+    .map(a => `• ${a.nombre || a.collar} (${razon[a.razon] || 'adoptado'}${a.sin_animal ? ' · collar sin animal registrado' : ''})`);
+  if (status === 409 && c.motivo === 'animales') {
+    t += `\n\nAdoptados por ella: ${c.adoptados || 0} · con su última posición adentro: ${c.adentro || 0}`;
+    if (lista.length) t += '\n' + lista.join('\n');
+  } else if (status === 409 && c.motivo === 'confirmar' && lista.length) {
+    t += '\n\n' + lista.join('\n');
+  }
+  return t;
+}
+// ⟦LOGICA-PURA-CERCAS⟧ fin
+
+// ── Pegamento con Leaflet y la pantalla ─────────────────────────
+let editingCercaId = null;      // la cerca abierta en el panel «Editar cerca» (nombre, tipo, color…)
+let cercaDesbloqueada = null;   // { id, nombre, color, warn, original, forma, version, capa, vertices, medios, manija, … }
+let guardandoCercaId = null;    // PATCH en camino: el sondeo no la toca y no se edita ni se borra
+const cercasEnCamino = new Set(); // interruptor Activa/Inactiva en camino: no se desbloquea ni se guarda su forma (T4)
+let gestoEst = gestoInicial();
+let toquesEst = toquesInicial();
+let gestoReloj = null;
+let gestoPrevio = null;         // { cercaId, x, y, t } del último desbloqueo: alterna en esquinas compartidas
+let suprimirClicHasta = 0;      // tras desbloquear o soltar, el clic que sigue no abre ventanitas ni hace zoom
+const punterosAbajo = new Set();
+
+// ¿Hay una cerca abierta en el panel «Editar cerca»? Se mira el panel y no solo editingCercaId,
+//  porque salir por las pestañas no lo limpia.
+function editorDeCercaAbierto() {
+  const p = document.getElementById('pane-editcerca');
+  return editingCercaId != null && !!p && p.style.display === 'block';
+}
+// Cercas que el sondeo NO toca: la desbloqueada (su forma vive en cercaDesbloqueada.forma) y la que
+//  se está guardando. La del panel «Editar cerca» NO hace falta: lo que el ranchero escribe vive en
+//  el formulario, y conservar la copia vieja haría que Guardar reenviara datos viejos.
+function idsCercasProtegidas() {
+  const s = new Set();
+  if (cercaDesbloqueada) s.add(cercaDesbloqueada.id);
+  if (guardandoCercaId != null) s.add(Number(guardandoCercaId));
+  return s;
+}
+function contextoDesbloqueo() {
+  return {
+    desbloqueadaId: cercaDesbloqueada ? cercaDesbloqueada.id : null,
+    desbloqueadaNombre: cercaDesbloqueada ? cercaDesbloqueada.nombre : null,
+    guardandoId: guardandoCercaId,
+    enCamino: [...cercasEnCamino],
+    editorId: editorDeCercaAbierto() ? Number(editingCercaId) : null,
+    modo: drawingMode ? 'dibujar la cerca nueva' : colocandoAguaje ? 'marcar aguajes'
+        : colocandoInfra ? 'marcar infraestructura' : null,
+  };
+}
+function textoTerminaEdicionPrimero() {
+  return cercaDesbloqueada ? `Primero guarda o cancela la forma de «${cercaDesbloqueada.nombre}».` : '';
+}
+
+// Pone en `cercas` la fila que devolvió el servidor (PATCH/POST), con su versión. Si el servidor no
+//  la devolvió (uno viejo), se aplica lo que se mandó.
+// Revisión adversarial T4 (2026-10-07): una respuesta que llega tarde con una versión MÁS VIEJA que la
+//  cerca local (p. ej. la del interruptor, que salió antes que un guardado de la forma) no la pisa.
+function aplicarCercaDelServidor(valla, c, enviado) {
+  const id = Number(c.id);
+  const i = cercas.findIndex(x => Number(x.id) === id);
+  let nueva;
+  if (valla && valla.id != null) {
+    if (i >= 0 && (cercas[i].version || 0) > versionDeCerca(valla)) return cercas[i];
+    nueva = filaACerca(valla);
+  } else {
+    nueva = { ...c };
+    ['nombre', 'poligono', 'categoria', 'warn_dist_m', 'color', 'tipo', 'activa', 'lote', 'collares']
+      .forEach(k => { if (enviado && enviado[k] !== undefined) nueva[k] = enviado[k]; });
+  }
+  if (i >= 0) cercas[i] = nueva; else cercas.unshift(nueva);
+  return nueva;
+}
+
+// Aviso corto sobre el mapa (no bloquea como alert).
+let avisoMapaReloj = null;
+function avisoMapa(texto, ms = 4500) {
+  const el = document.getElementById('aviso-mapa');
+  if (!el || !texto) return;
+  el.textContent = texto;
+  el.style.display = 'block';
+  clearTimeout(avisoMapaReloj);
+  avisoMapaReloj = setTimeout(() => { el.style.display = 'none'; }, ms);
+}
+
+// La barra de arriba del mapa mientras hay una cerca desbloqueada: nombre, esquinas, si cabe en el
+//  mensaje de radio (en vivo), el motivo de un guardado fallido, y Guardar / Cancelar.
+function actualizarBarraCerca() {
+  const b = document.getElementById('barra-cerca');
+  if (!b) return;
+  const d = cercaDesbloqueada;
+  if (!d) { b.style.display = 'none'; return; }
+  b.style.display = 'block';
+  const m = medirCercaEnElAire(d.forma, d.warn);
+  const nom = document.getElementById('bc-nombre');
+  if (nom) nom.textContent = '«' + d.nombre + '»';
+  const est = document.getElementById('bc-estado');
+  if (est) {
+    est.textContent = `${d.forma.length} esquinas · ${textoArea(areaPoligonoM2(d.forma))} · ` +
+      (m.cabe ? 'cabe en el mensaje de radio'
+              : `NO cabe en el mensaje de radio (${m.bytes} de ${CERCA_MAX_CLARO} B; caben ${m.maximo} esquinas)`);
+    est.classList.toggle('mal', !m.cabe);
+  }
+  const msg = document.getElementById('bc-msg');
+  if (msg) {
+    const texto = d.error || (d.cambioRemoto ? 'Ojo: otro teléfono cambió esta cerca mientras la editas. Si guardas, se queda TU forma.' : '');
+    msg.textContent = texto;
+    msg.className = 'bc-msg ' + (d.error ? 'error' : 'nota');
+    msg.style.display = texto ? 'block' : 'none';
+  }
+  const ocupado = guardandoCercaId != null;
+  const g = document.getElementById('bc-guardar'), x = document.getElementById('bc-cancelar');
+  if (g) { g.disabled = ocupado; g.textContent = ocupado ? 'Guardando…' : 'Guardar'; }
+  if (x) x.disabled = ocupado;
+}
+function marcarErrorEdicion(texto) {
+  if (cercaDesbloqueada) { cercaDesbloqueada.error = texto; actualizarBarraCerca(); }
+}
+
+// ── Desbloquear, pintar la edición, cerrar ──
+function desbloquearCerca(id) {
+  id = Number(id);
+  const c = cercas.find(x => Number(x.id) === id);
+  if (!c || !c.delServidor) return false;   // una recién dibujada sin id del servidor no se puede guardar
+  const p = puedeDesbloquear(contextoDesbloqueo(), id);
+  if (!p.ok) { avisoMapa(p.texto); return false; }
+  if (p.yaEstaba) return true;
+  cercaDesbloqueada = {
+    id, nombre: c.nombre, color: safeColor(c.color), warn: c.warn_dist_m || 10,
+    original: copiarForma(c.poligono), forma: copiarForma(c.poligono), version: c.version || 0,
+    capa: null, vertices: [], medios: [], manija: null, manijaPrev: null, error: '', cambioRemoto: false,
+  };
+  if (map.doubleClickZoom) map.doubleClickZoom.disable();   // el doble toque ahora GUARDA
+  map.getContainer().classList.add('cerca-desbloqueada');
+  map.closePopup();
+  pintarEdicionCerca();
+  renderCercas();          // esconde la capa normal de esta cerca
+  actualizarBarraCerca();
+  actualizarBotonFormaEditor();
+  return true;
+}
+
+function cerrarDesbloqueo() {
+  const d = cercaDesbloqueada;
+  if (!d) return;
+  quitarCapasEdicion(d);
+  cercaDesbloqueada = null;
+  map.getContainer().classList.remove('cerca-desbloqueada');
+  if (map.doubleClickZoom && !drawingMode) map.doubleClickZoom.enable();
+  renderCercas();
+  actualizarBarraCerca();
+  actualizarBotonFormaEditor();
+}
+
+// Esc o «Cancelar»: se descarta la forma editada y la cerca vuelve a como está en el servidor.
+function cancelarDesbloqueo() {
+  if (!cercaDesbloqueada || guardandoCercaId != null) return;
+  const nombre = cercaDesbloqueada.nombre;
+  const cambio = !mismaForma(cercaDesbloqueada.forma, cercaDesbloqueada.original);
+  cerrarDesbloqueo();
+  if (cambio) avisoMapa('Cambios de forma de «' + nombre + '» descartados.');
+}
+
+function iconoVerticeEdicion(color) {
+  return L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
+                     html: `<div class="vertice-edicion"><span style="background:${color}"></span></div>` });
+}
+function iconoMedioEdicion() {
+  return L.divIcon({ className: '', iconSize: [24, 24], iconAnchor: [12, 12], html: '<div class="medio-edicion"><span>+</span></div>' });
+}
+function quitarCapasEdicion(d) {
+  if (!d) return;
+  [d.capa, d.manija].concat(d.vertices || [], d.medios || []).forEach(l => { if (l) map.removeLayer(l); });
+  d.capa = null; d.manija = null; d.vertices = []; d.medios = [];
+}
+
+// La cerca desbloqueada: el polígono (sin eventos), un punto arrastrable por esquina, una manija ＋
+//  en medio de cada lado para agregar esquinas y la manija ✥ para mover todo. Son pocas capas (una
+//  sola cerca), así que se rehacen enteras al agregar o quitar una esquina.
+function pintarEdicionCerca() {
+  const d = cercaDesbloqueada;
+  if (!d) return;
+  quitarCapasEdicion(d);
+  d.capa = L.polygon(d.forma.map(p => [p.lat, p.lng]), {
+    color: d.color, weight: 3, fillColor: d.color, fillOpacity: 0.2, dashArray: '6 5', interactive: false
+  }).addTo(map);
+  d.vertices = d.forma.map(p => {
+    const m = L.marker([p.lat, p.lng], { draggable: true, autoPan: true, keyboard: false, zIndexOffset: 1000,
+                                         icon: iconoVerticeEdicion(d.color) }).addTo(map);
+    m.on('drag', () => moverVerticeEdicion(d.vertices.indexOf(m), m.getLatLng(), false));
+    m.on('dragend', () => { suprimirClicHasta = Date.now() + 400; despuesDeCambiarForma(); });
+    m.on('dblclick', () => quitarVerticeEdicion(d.vertices.indexOf(m)));
+    return m;
+  });
+  d.medios = puntosMedios(d.forma).map(pm => {
+    const m = L.marker([pm.lat, pm.lng], { draggable: true, keyboard: false, zIndexOffset: 900,
+                                           icon: iconoMedioEdicion() }).addTo(map);
+    m.bindTooltip('Agregar esquina', { direction: 'top', offset: [0, -10] });
+    m.on('drag', () => { if (d.capa) d.capa.setLatLngs(insertarVertice(d.forma, pm.i, m.getLatLng()).map(p => [p.lat, p.lng])); });
+    m.on('dragend', () => { suprimirClicHasta = Date.now() + 400; agregarVerticeEdicion(pm.i, m.getLatLng()); });
+    m.on('click', () => agregarVerticeEdicion(pm.i, m.getLatLng()));
+    return m;
+  });
+  const ctr = centroDeForma(d.forma);
+  d.manija = L.marker([ctr.lat, ctr.lng], {
+    draggable: true, keyboard: false, zIndexOffset: 1100,
+    icon: L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15],
+      html: '<div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid ' + d.color +
+            ';display:flex;align-items:center;justify-content:center;font-size:17px;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:move;">✥</div>' })
+  }).addTo(map);
+  d.manija.bindTooltip('Mover la cerca completa', { direction: 'top', offset: [0, -14] });
+  d.manijaPrev = d.manija.getLatLng();
+  d.manija.on('dragstart', () => { d.manijaPrev = d.manija.getLatLng(); });
+  d.manija.on('drag', () => {
+    const ahora = d.manija.getLatLng();
+    d.forma = trasladarForma(d.forma, ahora.lat - d.manijaPrev.lat, ahora.lng - d.manijaPrev.lng);
+    d.manijaPrev = ahora;
+    redibujarEdicion(true);
+  });
+  d.manija.on('dragend', () => { suprimirClicHasta = Date.now() + 400; despuesDeCambiarForma(); });
+}
+
+function moverVerticeEdicion(k, ll, moverMarcador) {
+  const d = cercaDesbloqueada;
+  if (!d || k < 0 || k >= d.forma.length) return;
+  d.forma[k] = { lat: ll.lat, lng: ll.lng };
+  if (moverMarcador && d.vertices[k]) d.vertices[k].setLatLng([ll.lat, ll.lng]);
+  redibujarEdicion(false);
+}
+function redibujarEdicion(moverVertices) {
+  const d = cercaDesbloqueada;
+  if (!d) return;
+  if (moverVertices) d.forma.forEach((p, k) => { if (d.vertices[k]) d.vertices[k].setLatLng([p.lat, p.lng]); });
+  if (d.capa) d.capa.setLatLngs(d.forma.map(p => [p.lat, p.lng]));
+  puntosMedios(d.forma).forEach((pm, k) => { if (d.medios[k]) d.medios[k].setLatLng([pm.lat, pm.lng]); });
+  d.error = '';
+  actualizarBarraCerca();
+}
+function despuesDeCambiarForma() {
+  const d = cercaDesbloqueada;
+  if (!d) return;
+  const ctr = centroDeForma(d.forma);
+  if (d.manija) { d.manija.setLatLng([ctr.lat, ctr.lng]); d.manijaPrev = d.manija.getLatLng(); }
+  actualizarBarraCerca();
+}
+function agregarVerticeEdicion(i, ll) {
+  const d = cercaDesbloqueada;
+  if (!d || guardandoCercaId != null) return;
+  d.forma = insertarVertice(d.forma, i, ll);
+  d.error = '';
+  pintarEdicionCerca();
+  actualizarBarraCerca();
+}
+function quitarVerticeEdicion(k) {
+  const d = cercaDesbloqueada;
+  if (!d || guardandoCercaId != null || k < 0) return;
+  const nueva = quitarVertice(d.forma, k);
+  if (!nueva) { avisoMapa('La cerca necesita al menos 3 esquinas.'); return; }
+  d.forma = nueva;
+  d.error = '';
+  pintarEdicionCerca();
+  actualizarBarraCerca();
+}
+// Mientras el PATCH va en camino no se arrastra nada: lo que se guarda es lo que se ve.
+function edicionArrastrable(si) {
+  const d = cercaDesbloqueada;
+  if (!d) return;
+  [d.manija].concat(d.vertices, d.medios).forEach(m => {
+    if (m && m.dragging) { if (si) m.dragging.enable(); else m.dragging.disable(); }
+  });
+}
+
+// ── El gesto en la pantalla (eventos de puntero: ratón, dedo y lápiz por igual) ──
+function ahoraMs() { return performance.now(); }
+function puntoDeEvento(e) { const p = map.mouseEventToContainerPoint(e); return { x: p.x, y: p.y }; }
+// ¿El dedo cayó en un punto arrastrable, una manija, un botón o una ventanita? Entonces no es «el mapa».
+function fueraDelMapa(e) {
+  const t = e.target;
+  return !!(t && t.closest && t.closest('.leaflet-control, .leaflet-popup, .leaflet-marker-icon, .leaflet-tooltip'));
+}
+// El vértice de una cerca BLOQUEADA bajo el dedo (la desbloqueada tiene sus propios puntos).
+function objetivoBajoPuntero(e, pt) {
+  const editId = cercaDesbloqueada ? cercaDesbloqueada.id : null;
+  const puntos = [];
+  cercas.forEach(c => {
+    const id = Number(c.id);
+    if (id === editId || !c.delServidor || !Array.isArray(c.poligono)) return;
+    const area = areaPoligonoM2(c.poligono);
+    c.poligono.forEach((v, idx) => {
+      const q = map.latLngToContainerPoint([v.lat, v.lng]);
+      puntos.push({ cercaId: id, idx, x: q.x, y: q.y, area });
+    });
+  });
+  const radio = GESTO_CERCA.radioPx[e.pointerType] || GESTO_CERCA.radioPx.mouse;
+  const p = gestoPrevio;
+  const previo = p && ahoraMs() - p.t < 15000 && Math.hypot(p.x - pt.x, p.y - pt.y) <= radio ? p : null;
+  return elegirVertice(puntos, pt.x, pt.y, radio, previo);
+}
+
+function alBajarPuntero(e) {
+  if (e.isPrimary) punterosAbajo.clear();
+  punterosAbajo.add(e.pointerId);
+  if (punterosAbajo.size > 1) {            // segundo dedo: es un pellizco, no este gesto
+    procesarGesto({ tipo: 'cancelar' });
+    procesarToques({ tipo: 'cancelar' });
+    return;
+  }
+  const pt = puntoDeEvento(e), t = ahoraMs();
+  const enMapa = !fueraDelMapa(e) && !(e.pointerType === 'mouse' && e.button !== 0);
+  procesarToques({ tipo: 'bajar', t, x: pt.x, y: pt.y, puntero: e.pointerId, valido: enMapa });
+  procesarGesto({ tipo: 'bajar', t, x: pt.x, y: pt.y, puntero: e.pointerId,
+                  objetivo: enMapa ? objetivoBajoPuntero(e, pt) : null });
+}
+function alMoverPuntero(e) {
+  if (gestoEst.fase === 'libre' && !toquesEst.abajo) return;
+  const pt = puntoDeEvento(e), t = ahoraMs();
+  procesarToques({ tipo: 'mover', t, x: pt.x, y: pt.y, puntero: e.pointerId });
+  procesarGesto({ tipo: 'mover', t, x: pt.x, y: pt.y, puntero: e.pointerId });
+}
+function alSubirPuntero(e) {
+  punterosAbajo.delete(e.pointerId);
+  if (gestoEst.fase === 'libre' && !toquesEst.abajo) return;
+  const pt = puntoDeEvento(e), t = ahoraMs();
+  procesarGesto({ tipo: 'subir', t, x: pt.x, y: pt.y, puntero: e.pointerId });
+  const r = procesarToques({ tipo: 'subir', t, x: pt.x, y: pt.y, puntero: e.pointerId });
+  if (r.doble && cercaDesbloqueada && guardandoCercaId == null) {
+    suprimirClicHasta = Date.now() + 500;   // que el clic/doble clic del navegador no haga zoom ni nada
+    guardarCercaDesbloqueada();
+  }
+}
+function alCancelarPuntero(e) {
+  punterosAbajo.delete(e.pointerId);
+  procesarGesto({ tipo: 'cancelar' });
+  procesarToques({ tipo: 'cancelar' });
+}
+function alMenuContextual(e) {   // mantener presionado no abre el menú del sistema
+  if (gestoEst.fase !== 'libre' || Date.now() < suprimirClicHasta) { e.preventDefault(); e.stopPropagation(); }
+}
+function alClicMapa(e) {          // el clic que sigue a desbloquear/soltar/guardar no abre ventanitas ni hace zoom
+  if (Date.now() < suprimirClicHasta) { e.preventDefault(); e.stopPropagation(); }
+}
+
+function procesarToques(ev) {
+  const r = toquesMapa(toquesEst, ev);
+  toquesEst = r.est;
+  return r;
+}
+function procesarGesto(ev) {
+  const antes = gestoEst;
+  const r = gestoVertice(gestoEst, ev);
+  gestoEst = r.est;
+  switch (r.accion) {
+    case 'empezar':
+      congelarArrastreMapa(Math.ceil(GESTO_CERCA.toleranciaPx * 1.5));   // el temblor del dedo no mueve el mapa
+      mostrarAnillo(r.est.x0, r.est.y0);
+      programarRelojGesto(GESTO_CERCA.msMantener);
+      break;
+    case 'esperar':
+      programarRelojGesto(r.msFaltan);
+      break;
+    case 'cancelar':
+      terminarMantener();
+      congelarArrastreMapa(false);     // si el dedo se movió, a partir de aquí el mapa se mueve normal
+      break;
+    case 'desbloquear': {
+      terminarMantener();
+      suprimirClicHasta = Date.now() + 700;
+      gestoPrevio = { cercaId: r.cercaId, x: antes.x0, y: antes.y0, t: ahoraMs() };
+      const ok = desbloquearCerca(r.cercaId);
+      if (ok) vibrar();
+      if (ok && r.sigueAbajo) {
+        congelarArrastreMapa(Infinity);  // el mismo dedo ahora arrastra el punto, no el mapa
+        soltarArrastreDeLeaflet();       // T1: y Leaflet no se queda «arrastrando» el mapa
+        if (r.x != null) arrastrarVerticeA(r.idx, r.x, r.y);
+      } else {
+        gestoEst = gestoInicial();
+        congelarArrastreMapa(false);
+      }
+      break;
+    }
+    case 'arrastrar':
+      arrastrarVerticeA(gestoEst.idx, r.x, r.y);
+      break;
+    case 'soltar':
+      congelarArrastreMapa(false);
+      suprimirClicHasta = Date.now() + 400;
+      despuesDeCambiarForma();
+      break;
+  }
+  return r;
+}
+// x, y: dónde va el VÉRTICE en pantalla (gestoVertice ya le sumó el desfase al dedo, T2).
+function arrastrarVerticeA(idx, x, y) {
+  if (!cercaDesbloqueada || guardandoCercaId != null) return;
+  moverVerticeEdicion(idx, map.containerPointToLatLng([x, y]), true);
+}
+// Revisión adversarial T1: el dedo que desbloqueó empezó, para Leaflet, un arrastre del MAPA
+//  (L.Draggable._dragging). Como el mapa ya está congelado y ese dedo ahora mueve el punto, se termina
+//  aquí ese arrastre: así no depende de que su touchend llegue a document. (Leaflet 1.9.4, interno.)
+function soltarArrastreDeLeaflet() {
+  try {
+    const d = map.dragging && map.dragging._draggable;
+    if (d && typeof L !== 'undefined' && L.Draggable && L.Draggable._dragging === d && typeof d.finishDrag === 'function')
+      d.finishDrag(true);
+  } catch (e) {}
+}
+function programarRelojGesto(ms) {
+  clearTimeout(gestoReloj);
+  gestoReloj = setTimeout(() => { gestoReloj = null; procesarGesto({ tipo: 'tic', t: ahoraMs() }); }, Math.max(0, ms));
+}
+function terminarMantener() {
+  clearTimeout(gestoReloj);
+  gestoReloj = null;
+  ocultarAnillo();
+}
+// Leaflet empieza a arrastrar el mapa cuando el dedo se mueve más de `clickTolerance` (3 px). Mientras
+//  se mantiene un vértice se sube, para que el temblor natural del dedo no mueva el mapa; al cancelar
+//  se regresa y el arrastre sigue normal desde donde empezó. (Leaflet 1.9.4, fijado con su hash.)
+function congelarArrastreMapa(tolerancia) {
+  const d = map.dragging && map.dragging._draggable;
+  if (!d || !d.options) return;
+  if (tolerancia === false) {
+    if (d._toleranciaLindero != null) { d.options.clickTolerance = d._toleranciaLindero; d._toleranciaLindero = null; }
+    return;
+  }
+  if (d._toleranciaLindero == null) d._toleranciaLindero = d.options.clickTolerance;
+  d.options.clickTolerance = tolerancia;
+}
+function vibrar() { try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) {} }
+function mostrarAnillo(x, y) {
+  let a = document.getElementById('anillo-cerca');
+  if (!a) {
+    a = document.createElement('div');
+    a.id = 'anillo-cerca';
+    a.className = 'anillo-cerca';
+    a.innerHTML = '<svg viewBox="0 0 64 64"><circle class="fondo" cx="32" cy="32" r="27"/><circle class="progreso" cx="32" cy="32" r="27"/></svg>';
+    map.getContainer().appendChild(a);
+  }
+  a.style.left = x + 'px';
+  a.style.top = y + 'px';
+  a.style.setProperty('--ms', GESTO_CERCA.msMantener + 'ms');
+  a.classList.remove('lleno');
+  void a.offsetWidth;            // reinicia la animación
+  a.classList.add('lleno');
+  a.style.display = 'block';
+}
+function ocultarAnillo() {
+  const a = document.getElementById('anillo-cerca');
+  if (a) { a.style.display = 'none'; a.classList.remove('lleno'); }
+}
+
+function instalarGestosCerca() {
+  const cont = map.getContainer();
+  cont.addEventListener('pointerdown', alBajarPuntero, true);
+  window.addEventListener('pointermove', alMoverPuntero, true);
+  window.addEventListener('pointerup', alSubirPuntero, true);
+  window.addEventListener('pointercancel', alCancelarPuntero, true);
+  cont.addEventListener('contextmenu', alMenuContextual, true);
+  cont.addEventListener('click', alClicMapa, true);
+  cont.addEventListener('dblclick', alClicMapa, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && cercaDesbloqueada) cancelarDesbloqueo(); });
+  // Si el mapa se mueve por otra causa (encuadre, zoom), el vértice ya no está bajo el dedo.
+  map.on('movestart zoomstart', () => { if (gestoEst.fase === 'manteniendo') procesarGesto({ tipo: 'cancelar' }); });
+}
+
+// ── Guardar (D2: la forma editada nunca se pierde) ──
+function confirmarAnimalesFuera(c, forma) {
+  const r = adoptadosQueQuedanFuera(c, forma, animales);
+  return !r.fuera.length || confirm(textoQuedanFuera(c.nombre, r));
+}
+
+// PATCH de una cerca. Revisión adversarial S2 (2026-10-07): si el servidor responde 409 «confirmar»
+//  (encenderla, o volverla de contención, deja adoptados FUERA de ella: recibirían aviso y estímulo), se
+//  pregunta con su texto y, si el ranchero acepta, se repite con confirmar_fuera:true.
+// Devuelve { res, datos, cancelado }; res = null si no hubo conexión.
+async function pedirPatchCerca(id, cuerpo, queSeIntenta) {
+  const pedir = async b => {
+    const res = await authFetch(`${API_BASE}/geovallas/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b)
+    });
+    return { res, datos: await res.json().catch(() => ({})) };
+  };
+  try {
+    let r = await pedir(cuerpo);
+    if (r.res.status === 409 && r.datos && r.datos.motivo === 'confirmar') {
+      if (!confirm(textoErrorCerca(queSeIntenta, 409, r.datos) + '\n\n¿Seguir de todos modos?')) return { ...r, cancelado: true };
+      r = await pedir({ ...cuerpo, confirmar_fuera: true });
+    }
+    return r;
+  } catch (e) { return { res: null, datos: {} }; }
+}
+
+// PATCH común (forma sola o el panel completo). Si falla, la cerca SIGUE desbloqueada con su forma y
+//  se dice por qué; con 200, la cerca local pasa a ser la que devolvió el servidor (con su versión) y
+//  se pone la barrera para que ningún sondeo pedido antes la regrese.
+async function enviarPatchCerca(c, cuerpo, queSeIntenta) {
+  const id = Number(c.id);
+  guardandoCercaId = id;
+  if (cercaDesbloqueada && cercaDesbloqueada.id === id) cercaDesbloqueada.error = '';
+  edicionArrastrable(false);
+  actualizarBarraCerca();
+  const { res, datos, cancelado } = await pedirPatchCerca(id, cuerpo, queSeIntenta);
+  guardandoCercaId = null;
+  edicionArrastrable(true);
+  if (cancelado) {
+    marcarErrorEdicion('No se guardó: lo cancelaste. La forma sigue abierta.');
+    actualizarBarraCerca();
+    return { ok: false, status: 409, datos };
+  }
+  if (!res || !res.ok) {
+    const texto = textoErrorCerca(queSeIntenta, res ? res.status : 0, datos);
+    const sigue = !!cercaDesbloqueada && cercaDesbloqueada.id === id;
+    if (sigue) marcarErrorEdicion(texto); else actualizarBarraCerca();
+    alert('⚠ ' + texto + (sigue ? '\n\nTu forma sigue abierta en el mapa, sin guardar: corrígela y vuelve a guardar, o pulsa Cancelar para descartarla.' : ''));
+    return { ok: false, status: res ? res.status : 0, datos };
+  }
+  aplicarCercaDelServidor(datos.valla, c, cuerpo);
+  cercasSync.barrera = cercasSync.pedida;
+  if (cercaDesbloqueada && cercaDesbloqueada.id === id) cerrarDesbloqueo(); else renderCercas();
+  renderCercasList();
+  return { ok: true, datos };
+}
+
+// Doble toque en el mapa o «Guardar» de la barra. Si el panel «Editar cerca» de ESA cerca está
+//  abierto, se guarda todo (nombre, tipo, color…) con guardarEdicionCerca.
+async function guardarCercaDesbloqueada() {
+  const d = cercaDesbloqueada;
+  if (!d || guardandoCercaId != null) return;
+  if (cercasEnCamino.has(d.id)) {   // T4: que la respuesta del interruptor no se cruce con esta
+    marcarErrorEdicion('No se guardó todavía: va en camino el cambio de Activa/Inactiva de esta cerca. Vuelve a guardar en un momento.');
+    return;
+  }
+  if (editorDeCercaAbierto() && Number(editingCercaId) === d.id) return guardarEdicionCerca();
+  const c = cercas.find(x => Number(x.id) === d.id);
+  if (!c) { marcarErrorEdicion('Esta cerca ya no está en el tablero.'); return; }
+  const forma = copiarForma(d.forma);
+  if (mismaForma(forma, d.original)) { cerrarDesbloqueo(); avisoMapa('Sin cambios en la forma de «' + c.nombre + '».'); return; }
+  if (!cercaCabeOAvisa(forma, c.warn_dist_m, c.nombre)) {
+    marcarErrorEdicion('No se guardó: no cabe en un mensaje de radio. Quítale esquinas (doble toque en un punto) o achícala, y vuelve a guardar.');
+    return;
+  }
+  if (!confirmarAnimalesFuera(c, forma)) {
+    marcarErrorEdicion('No se guardó: la forma sigue abierta para que la ajustes.');
+    return;
+  }
+  const r = await enviarPatchCerca(c, { poligono: forma }, 'guardar la forma de «' + c.nombre + '»');
+  if (r.ok) avisoMapa('✅ Forma de «' + c.nombre + '» guardada');
+}
+
+// ── Panel «Editar cerca» (nombre, tipo, categoría, color, a quién cerca) ──
 function abrirEditarCerca(id) {
-  const c = cercas.find(x => x.id === id);
+  const c = cercas.find(x => Number(x.id) === Number(id));
   if (!c) return;
-  editingCercaId = id;
+  editingCercaId = Number(id);
 
   // Llenar el formulario
   document.getElementById('ec-nombre').value = c.nombre;
@@ -3569,200 +4616,114 @@ function abrirEditarCerca(id) {
   // Centrar y resaltar la cerca en el mapa
   irACerca(c.poligono);
   showTab('editcerca');
+  actualizarBotonFormaEditor();
 }
 
-// Activar/desactivar el arrastre de vértices con marcadores arrastrables
-let vertexMarkers = [];   // marcadores en cada esquina
-let moveHandle = null;    // 🆕 manija central que traslada la cerca COMPLETA
-let moveHandlePrev = null;
-
-function toggleEditarForma() {
-  const c = cercas.find(x => x.id === editingCercaId);
-  if (!c) return;
-  const btn = document.getElementById('ec-shape-btn');
-
-  if (!editandoForma) {
-    // Dibujar el polígono base
-    editPolyLayer = L.polygon(c.poligono.map(p => [p.lat, p.lng]), {
-      color: c.color, weight: 2, fillOpacity: 0.2
-    }).addTo(map);
-    map.fitBounds(editPolyLayer.getBounds().pad(0.3));
-
-    // Crear un marcador arrastrable en cada vértice
-    vertexMarkers = [];
-    c.poligono.forEach((p, i) => {
-      const m = L.marker([p.lat, p.lng], {
-        draggable: true,
-        icon: L.divIcon({
-          className: '',
-          html: '<div style="width:18px;height:18px;border-radius:50%;background:'+c.color+';border:3px solid white;box-shadow:0 0 0 2px rgba(0,0,0,.4);"></div>',
-          iconSize: [18, 18], iconAnchor: [9, 9]
-        })
-      }).addTo(map);
-
-      // Al arrastrar, redibujar el polígono en vivo
-      m.on('drag', () => {
-        const pts = vertexMarkers.map(mk => mk.getLatLng());
-        editPolyLayer.setLatLngs(pts);
-      });
-      // Doble clic en un vértice lo elimina (si quedan más de 3)
-      m.on('dblclick', () => {
-        if (vertexMarkers.length <= 3) { alert('La cerca necesita al menos 3 puntos'); return; }
-        map.removeLayer(m);
-        vertexMarkers = vertexMarkers.filter(x => x !== m);
-        editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
-      });
-      vertexMarkers.push(m);
-    });
-
-    // Tocar el borde del polígono agrega un vértice nuevo ahí
-    editPolyLayer.on('click', (e) => {
-      agregarVerticeEn(e.latlng, c.color);
-    });
-
-    // 🆕 Mover la cerca COMPLETA: manija ✥ en el centro; arrastrarla traslada
-    // todos los vértices por el mismo delta (y el polígono en vivo).
-    const ctr = editPolyLayer.getBounds().getCenter();
-    moveHandle = L.marker(ctr, {
-      draggable: true,
-      icon: L.divIcon({
-        className: '',
-        html: '<div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid ' + safeColor(c.color) + ';display:flex;align-items:center;justify-content:center;font-size:17px;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:move;">✥</div>',
-        iconSize: [30, 30], iconAnchor: [15, 15]
-      })
-    }).addTo(map);
-    moveHandle.bindTooltip('Mover cerca completa', { direction: 'top', offset: [0, -14] });
-    moveHandlePrev = ctr;
-    moveHandle.on('drag', () => {
-      const now = moveHandle.getLatLng();
-      const dLat = now.lat - moveHandlePrev.lat, dLng = now.lng - moveHandlePrev.lng;
-      vertexMarkers.forEach(mk => {
-        const p = mk.getLatLng();
-        mk.setLatLng([p.lat + dLat, p.lng + dLng]);
-      });
-      editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
-      moveHandlePrev = now;
-    });
-
-    editandoForma = true;
-    btn.textContent = '✓ Terminar de editar forma';
-    btn.classList.add('btn-primary');
-  } else {
-    capturarForma(c);
-    btn.textContent = '✎ Editar forma (arrastrar puntos)';
-    btn.classList.remove('btn-primary');
-    renderCercas();
+// «✎ Editar forma en el mapa» desbloquea la cerca del panel (lo mismo que mantener un punto 3 s);
+//  con la forma ya desbloqueada, el mismo botón deshace los cambios de forma.
+function editarFormaDesdePanel() {
+  if (editingCercaId == null) return;
+  const id = Number(editingCercaId);
+  if (cercaDesbloqueada && cercaDesbloqueada.id === id) { cancelarDesbloqueo(); return; }
+  const c = cercas.find(x => Number(x.id) === id);
+  if (!c || !desbloquearCerca(id)) return;
+  irACerca(c.poligono);
+  if (window.innerWidth <= 820) {   // en el teléfono, recoger el panel para ver el mapa
+    const sb = document.getElementById('sidebar');
+    if (sb) sb.classList.remove('abierto');
+    setTimeout(fixMapSize, 320);
   }
 }
-
-// Insertar un vértice nuevo en el punto más cercano del borde
-function agregarVerticeEn(latlng, color) {
-  // Encontrar entre qué dos vértices insertar (el segmento más cercano)
-  const pts = vertexMarkers.map(m => m.getLatLng());
-  let mejorIdx = 0, mejorDist = Infinity;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i], b = pts[(i+1) % pts.length];
-    const mid = L.latLng((a.lat+b.lat)/2, (a.lng+b.lng)/2);
-    const d = latlng.distanceTo(mid);
-    if (d < mejorDist) { mejorDist = d; mejorIdx = i + 1; }
-  }
-  const m = L.marker(latlng, {
-    draggable: true,
-    icon: L.divIcon({
-      className: '',
-      html: '<div style="width:18px;height:18px;border-radius:50%;background:'+color+';border:3px solid white;box-shadow:0 0 0 2px rgba(0,0,0,.4);"></div>',
-      iconSize: [18, 18], iconAnchor: [9, 9]
-    })
-  }).addTo(map);
-  m.on('drag', () => editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng())));
-  m.on('dblclick', () => {
-    if (vertexMarkers.length <= 3) { alert('La cerca necesita al menos 3 puntos'); return; }
-    map.removeLayer(m);
-    vertexMarkers = vertexMarkers.filter(x => x !== m);
-    editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
-  });
-  vertexMarkers.splice(mejorIdx, 0, m);
-  editPolyLayer.setLatLngs(vertexMarkers.map(mk => mk.getLatLng()));
-}
-
-// Tomar la forma editada y limpiar los marcadores
-function capturarForma(c) {
-  if (vertexMarkers.length) {
-    c.poligono = vertexMarkers.map(m => {
-      const ll = m.getLatLng();
-      return { lat: ll.lat, lng: ll.lng };
-    });
-  }
-  vertexMarkers.forEach(m => map.removeLayer(m));
-  vertexMarkers = [];
-  if (moveHandle) { map.removeLayer(moveHandle); moveHandle = null; }
-  if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
-  editandoForma = false;
+function actualizarBotonFormaEditor() {
+  const b = document.getElementById('ec-shape-btn');
+  if (!b) return;
+  const activa = !!cercaDesbloqueada && editingCercaId != null && cercaDesbloqueada.id === Number(editingCercaId);
+  b.textContent = activa ? '↺ Deshacer cambios de forma' : '✎ Editar forma en el mapa';
 }
 
 async function guardarEdicionCerca() {
-  const c = cercas.find(x => x.id === editingCercaId);
-  if (!c) return;
-
-  // Si quedó la edición de forma activa, capturarla primero
-  if (editandoForma) capturarForma(c);
-
-  // Tomar los valores del formulario
-  c.nombre = document.getElementById('ec-nombre').value.trim() || c.nombre;
-  c.tipo = document.getElementById('ec-tipo').value;
-  c.categoria = document.getElementById('ec-categoria')?.value || c.categoria || 'potrero';
+  const c = cercas.find(x => Number(x.id) === Number(editingCercaId));
+  if (!c || guardandoCercaId != null) return;
+  if (cercasEnCamino.has(Number(c.id))) {   // T4
+    avisoMapa('Espera: va en camino el cambio de Activa/Inactiva de esta cerca. Vuelve a guardar en un momento.');
+    marcarErrorEdicion('No se guardó todavía: va en camino el cambio de Activa/Inactiva de esta cerca.');
+    return;
+  }
+  const d = cercaDesbloqueada && cercaDesbloqueada.id === Number(c.id) ? cercaDesbloqueada : null;
+  // La forma que se manda es la que SE VE: la desbloqueada si la hay. Nada se escribe en `c` antes de
+  //  que el servidor diga que sí; si dice que no, todo sigue abierto como estaba.
+  const forma = d ? copiarForma(d.forma) : c.poligono;
+  const nombre = document.getElementById('ec-nombre').value.trim() || c.nombre;
+  const tipo = document.getElementById('ec-tipo').value || c.tipo || 'permanente';
+  const categoria = document.getElementById('ec-categoria')?.value || c.categoria || 'potrero';
   let warnDist = parseInt(document.getElementById('ec-warn')?.value, 10);
   if (!Number.isFinite(warnDist) || warnDist < 2 || warnDist > 200) warnDist = c.warn_dist_m || 10;
-  c.warn_dist_m = warnDist;
-  c.color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
+  const color = document.querySelector('#ec-colors .color-opt.active')?.dataset.c || c.color;
   const lotePedido = document.getElementById('ec-lote')?.value ?? '__mantener__';
 
   // 🆕 2026-09-17: editar tambien puede pasarse del marco — mover un vertice lejos
   //  agranda los desplazamientos y con ellos los bytes, aunque no cambie el numero
-  //  de esquinas. Se mide DESPUES de capturar la forma y con la banda de aviso ya
-  //  resuelta, que es lo que de verdad viajara.
-  if (!cercaCabeOAvisa(c.poligono, c.warn_dist_m, c.nombre)) return;
-
-  // Guardar en el servidor
-  try {
-    const res = await authFetch(`${API_BASE}/geovallas/${c.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nombre: c.nombre, poligono: c.poligono, categoria: c.categoria,
-        warn_dist_m: c.warn_dist_m, color: c.color,
-        // 🆕 2026-08-29: '__mantener__' = no tocar a quien cerca. Cualquier otra
-        //  opcion reescribe las DOS cosas: sin limpiar 'collares', elegir "todo
-        //  el rancho" en una cerca vieja no haria nada — el servidor caeria en su
-        //  lista fija y seguiria cercando solo a los de antes, en silencio.
-        ...(lotePedido === '__mantener__' ? {} : {
-          lote: lotePedido === '' ? null : parseInt(lotePedido),
-          collares: []
-        })
-      })
-    });
-    if (res.ok) {
-      alert('✅ Cerca "' + c.nombre + '" actualizada');
-      actualizarDesdeServidor();
-      showTab('cercas');
-    } else {
-      const err = await res.text();
-      alert('⚠ No se pudo guardar: ' + err);
-    }
-  } catch(e) {
-    alert('⚠ Error de conexión al guardar.');
+  //  de esquinas. Se mide con la forma que se ve y con la banda de aviso ya
+  //  resuelta, que es lo que de verdad viajara. Si no cabe, la forma queda
+  //  desbloqueada en el mapa para quitarle esquinas (no se pierde).
+  if (!cercaCabeOAvisa(forma, warnDist, nombre)) {
+    if (!d) desbloquearCerca(c.id);
+    marcarErrorEdicion('No se guardó: no cabe en un mensaje de radio. Quítale esquinas (doble toque en un punto) o achícala, y vuelve a guardar.');
+    return;
   }
+  // El tipo se guarda (2026-10-07). Volverla exclusión con animales adentro los empuja a salir: se
+  //  pregunta. Volverla temporal pide su duración. (Si hay animales que dependen de ella, el servidor
+  //  responde 409 y aquí se dice cuántos.)
+  if (tipo === 'exclusion' && c.tipo !== 'exclusion' &&
+      !confirm('Al volverla Exclusión, el animal que esté adentro recibe el aviso y, si no sale, ' +
+               'el estímulo.\n\n¿Guardarla como Exclusión?')) return;
+  let horasTemporal;
+  if (tipo === 'temporal' && c.tipo !== 'temporal') {
+    const r = prompt('¿Cuántas horas va a durar la cerca temporal?', '24');
+    if (r === null) return;
+    horasTemporal = parseFloat(r);
+    // Revisión S3: el mínimo es 1 h, como en el servidor (con 0.0003 h caducaba en un segundo).
+    if (!(horasTemporal >= 1 && horasTemporal <= 8760)) { alert('Pon un número de horas entre 1 y 8760.'); return; }
+  }
+  if (d && !mismaForma(forma, c.poligono) && (tipo === 'permanente' || tipo === 'temporal') &&
+      !confirmarAnimalesFuera(c, forma)) {
+    marcarErrorEdicion('No se guardó: la forma sigue abierta para que la ajustes.');
+    return;
+  }
+
+  const r = await enviarPatchCerca(c, {
+    nombre, categoria, warn_dist_m: warnDist, color, tipo,
+    // La forma viaja solo si se editó (desbloqueada): si no, el servidor conserva la suya y un
+    //  cambio hecho desde otro teléfono no se pisa con la copia de esta pantalla.
+    ...(d ? { poligono: forma } : {}),
+    ...(horasTemporal ? { horas: horasTemporal } : {}),
+    // 🆕 2026-08-29: '__mantener__' = no tocar a quien cerca. Cualquier otra
+    //  opcion reescribe las DOS cosas: sin limpiar 'collares', elegir "todo
+    //  el rancho" en una cerca vieja no haria nada — el servidor caeria en su
+    //  lista fija y seguiria cercando solo a los de antes, en silencio.
+    ...(lotePedido === '__mantener__' ? {} : {
+      lote: lotePedido === '' ? null : parseInt(lotePedido),
+      collares: []
+    })
+  }, 'guardar «' + nombre + '»');
+  if (!r.ok) return;     // el panel y la forma siguen abiertos, con el motivo a la vista
+  editingCercaId = null;
+  avisoMapa('✅ Cerca «' + nombre + '» guardada');
+  showTab('cercas');
+  actualizarDesdeServidor();
 }
 
 // 🆕 Duplicar la cerca completa (2026-07-24): crea una copia desplazada al sur del
 // original, con la misma categoría/tipo/color/aviso y la MISMA asignación de collares
 // que la original (semántica idéntica; luego se mueve/edita). Temporal → copia de 6 h.
 async function duplicarCerca() {
-  const c = cercas.find(x => x.id === editingCercaId);
+  const c = cercas.find(x => Number(x.id) === Number(editingCercaId));
   if (!c) return;
-  if (editandoForma) capturarForma(c);   // no duplicar una forma a medio editar
-  const lats = c.poligono.map(p => p.lat);
+  // Con la forma desbloqueada se duplica la que se ve, no la guardada.
+  const base = cercaDesbloqueada && cercaDesbloqueada.id === Number(c.id) ? cercaDesbloqueada.forma : c.poligono;
+  const lats = base.map(p => p.lat);
   const alto = (Math.max(...lats) - Math.min(...lats)) || 0.001;
-  const poligono = c.poligono.map(p => ({ lat: p.lat - alto * 1.15, lng: p.lng }));
+  const poligono = base.map(p => ({ lat: p.lat - alto * 1.15, lng: p.lng }));
   if (!cercaCabeOAvisa(poligono, c.warn_dist_m, (c.nombre || 'Cerca') + ' (copia)')) return;
   const payload = {
     nombre: (c.nombre || 'Cerca') + ' (copia)',
@@ -3780,7 +4741,8 @@ async function duplicarCerca() {
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      alert('⧉ Copia creada: "' + payload.nombre + '". Muévela con ✥ desde Editar.');
+      cercasSync.barrera = cercasSync.pedida;
+      alert('⧉ Copia creada: "' + payload.nombre + '". Mantén presionado un punto 3 s para moverla o ajustarla.');
       actualizarDesdeServidor();
       showTab('cercas');
     } else {
@@ -3790,16 +4752,17 @@ async function duplicarCerca() {
   } catch(e) { alert('⚠ Error de conexión al duplicar.'); }
 }
 
+// Revisión adversarial T3 (2026-10-07): «Cancelar» cierra el FORMULARIO. Si la forma de esa cerca está
+//  desbloqueada en el mapa y cambió, se queda abierta (tiene su barra con Guardar y Cancelar): antes este
+//  botón la descartaba sin avisar. Si no cambió, no hay nada que perder y se cierra.
 function cancelarEdicionCerca() {
-  if (editandoForma) {
-    vertexMarkers.forEach(m => map.removeLayer(m));
-    vertexMarkers = [];
-    if (moveHandle) { map.removeLayer(moveHandle); moveHandle = null; }
-    if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
-    editandoForma = false;
-  }
+  if (guardandoCercaId != null) return;
+  const d = cercaDesbloqueada && cercaDesbloqueada.id === Number(editingCercaId) ? cercaDesbloqueada : null;
   editingCercaId = null;
+  if (d && mismaForma(d.forma, d.original)) cerrarDesbloqueo();
+  else if (d) avisoMapa('La forma de «' + d.nombre + '» sigue abierta en el mapa: guárdala (doble toque o «Guardar») o cancélala.', 6000);
   showTab('cercas');
+  actualizarBotonFormaEditor();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3809,6 +4772,7 @@ renderLotes();
 renderAnimales();
 renderAnimalesList();
 renderCercas();
+instalarGestosCerca();   // 🆕 2026-10-07 (D3): mantener un vértice 3 s desbloquea su cerca
 marcarTema();
 // El polling solo trae datos cuando ya hay sesión iniciada (authToken).
 setInterval(() => { if (authToken) actualizarDesdeServidor(); }, 5000);
