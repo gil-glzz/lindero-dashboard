@@ -334,7 +334,7 @@
 
   /* ── Cercas: vértices siempre visibles y edición sobre el mapa (2026-10-07, D3) ──
      Los puntos de todas las cercas van en UN lienzo (canvas) que no recibe toques: el toque lo
-     resuelve el tablero por distancia (ver elegirVertice). Mantener un punto 3 s desbloquea su
+     resuelve el tablero por distancia (ver elegirVertice). Mantener un punto 1 s desbloquea su
      cerca; mientras, el mapa no muestra el menú del sistema ni selecciona texto. */
   #map .leaflet-map-pane, #map .leaflet-map-pane img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   #map .leaflet-popup-content { -webkit-user-select: text; user-select: text; }
@@ -352,7 +352,7 @@
     stroke: #fff; stroke-linecap: round; stroke-dasharray: 169.65; stroke-dashoffset: 169.65;
     filter: drop-shadow(0 0 2px rgba(0,0,0,.8));
   }
-  .anillo-cerca.lleno .progreso { animation: lindero-llenar var(--ms, 3000ms) linear forwards; }
+  .anillo-cerca.lleno .progreso { animation: lindero-llenar var(--ms, 1000ms) linear forwards; }
   @keyframes lindero-llenar { to { stroke-dashoffset: 0; } }
   .vertice-edicion { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: grab; }
   .vertice-edicion > span {
@@ -813,7 +813,7 @@
           ✎ Editar forma en el mapa
         </button>
         <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px; line-height:1.5">
-          También sin abrir este panel: <b>mantén presionado 3 segundos</b> cualquier punto de la cerca en el mapa.
+          También sin abrir este panel: <b>mantén presionado 1 segundo</b> cualquier punto de la cerca en el mapa.
           Arrastra los puntos; <b>＋</b> agrega una esquina; doble toque en un punto lo quita; la manija <b>✥</b> mueve la cerca completa.
           <b>Guardar cambios</b> (o doble toque en el mapa) guarda la forma junto con lo de arriba.
         </p>
@@ -887,7 +887,7 @@
       <button class="map-btn" id="layer-terr" onclick="setLayer('terr')">Terreno</button>
       <button class="map-btn" id="btn-cambiar-sat" onclick="cambiarSatelite()" title="Cambiar proveedor de satélite si no carga">⟳ Otro satélite</button>
     </div>
-    <!-- 🆕 2026-10-07 (D3): barra de la cerca desbloqueada (mantener un punto 3 s, o «Editar forma») -->
+    <!-- 🆕 2026-10-07 (D3): barra de la cerca desbloqueada (mantener un punto 1 s, o «Editar forma») -->
     <div id="barra-cerca" class="barra-cerca" role="region" aria-label="Edición de la forma de la cerca">
       <div class="bc-fila">
         <div class="bc-titulo">✎ <span id="bc-nombre"></span></div>
@@ -1649,7 +1649,7 @@ function pintarCerca(c, firma) {
     const h = Math.max(0, Math.floor(ms/3600000));
     popup += `<br>Expira en ${h}h`;
   }
-  if (c.delServidor) popup += `<br><span style="color:#6b7280; font-size:11px;">Mantén presionado un punto 3 s para editar la forma</span>`;
+  if (c.delServidor) popup += `<br><span style="color:#6b7280; font-size:11px;">Mantén presionado un punto 1 s para editar la forma</span>`;
   poly.bindPopup(popup);
   // Vértices siempre visibles: chicos, sin eventos, en el lienzo compartido.
   const puntos = L.layerGroup(c.poligono.map(p => L.circleMarker([p.lat, p.lng], {
@@ -3716,14 +3716,14 @@ function irACerca(poligono) {
 // ════════════════════════════════════════════════════════════
 //  Lo pidió Gilberto: «no importa el momento: si cambio el polígono en el tablero, se tiene que
 //  mantener»; los vértices de cada cerca siempre a la vista; y editar SIN el botón: mantener
-//  presionado un vértice 3 s desbloquea su cerca, se arrastran los puntos, y doble toque en el mapa
+//  presionado un vértice 1 s desbloquea su cerca, se arrastran los puntos, y doble toque en el mapa
 //  (o «Guardar») guarda. Esc o «Cancelar» descarta.
 //  Arriba va la lógica PURA (sin Leaflet ni DOM), que tools/test_tablero_cercas.js corre en node con
 //  tiempos exactos. Abajo, el pegamento con Leaflet y la pantalla.
 
 // ⟦LOGICA-PURA-CERCAS⟧ inicio
 const GESTO_CERCA = {
-  msMantener: 3000,       // mantener quieto un vértice este tiempo desbloquea su cerca
+  msMantener: 1000,       // mantener quieto un vértice este tiempo desbloquea su cerca (3 s hasta el 2026-10-07; Gilberto pidió 1 s)
   toleranciaPx: 10,       // moverse más que esto antes de tiempo cancela, y el mapa se mueve normal
   msToque: 350,           // un toque dura menos que esto…
   msEntreToques: 400,     // …el segundo empieza antes de esto tras soltar el primero…
@@ -3744,7 +3744,7 @@ const GESTO_CERCA = {
 // objetivo.x/.y = el vértice en pantalla. Revisión adversarial T2 (2026-10-07): antes el vértice
 //  brincaba hasta el dedo (que cae hasta a 22 px) y un temblor de 1 px al soltar lo movía hasta ~90 m
 //  sin que se viera (el dedo lo tapa). Ahora el vértice se mueve LO QUE el dedo se mueva desde donde
-//  estaba al desbloquear, y solo cuando se aleja más de toleranciaPx: mantener 3 s y soltar con un
+//  estaba al desbloquear, y solo cuando se aleja más de toleranciaPx: mantener 1 s y soltar con un
 //  temblor no cambia la forma.
 function gestoInicial() { return { fase: 'libre' }; }
 function gestoVertice(est, ev, opc = GESTO_CERCA) {
@@ -4619,7 +4619,7 @@ function abrirEditarCerca(id) {
   actualizarBotonFormaEditor();
 }
 
-// «✎ Editar forma en el mapa» desbloquea la cerca del panel (lo mismo que mantener un punto 3 s);
+// «✎ Editar forma en el mapa» desbloquea la cerca del panel (lo mismo que mantener un punto 1 s);
 //  con la forma ya desbloqueada, el mismo botón deshace los cambios de forma.
 function editarFormaDesdePanel() {
   if (editingCercaId == null) return;
@@ -4742,7 +4742,7 @@ async function duplicarCerca() {
     });
     if (res.ok) {
       cercasSync.barrera = cercasSync.pedida;
-      alert('⧉ Copia creada: "' + payload.nombre + '". Mantén presionado un punto 3 s para moverla o ajustarla.');
+      alert('⧉ Copia creada: "' + payload.nombre + '". Mantén presionado un punto 1 s para moverla o ajustarla.');
       actualizarDesdeServidor();
       showTab('cercas');
     } else {
@@ -4772,7 +4772,7 @@ renderLotes();
 renderAnimales();
 renderAnimalesList();
 renderCercas();
-instalarGestosCerca();   // 🆕 2026-10-07 (D3): mantener un vértice 3 s desbloquea su cerca
+instalarGestosCerca();   // 🆕 2026-10-07 (D3): mantener un vértice 1 s desbloquea su cerca
 marcarTema();
 // El polling solo trae datos cuando ya hay sesión iniciada (authToken).
 setInterval(() => { if (authToken) actualizarDesdeServidor(); }, 5000);
