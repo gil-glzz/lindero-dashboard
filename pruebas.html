@@ -25,8 +25,14 @@
     --mono:'Space Grotesk',ui-monospace,monospace;
     --sans:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
     --r:14px; --r-sm:9px;
+    /* series de las gráficas (pestaña Energía): ranuras 1 y 2 de la paleta categórica para fondo oscuro, validadas
+       contra --panel; nunca los colores de estado. Las franjas con fuente van en tinta neutra. */
+    --serie-1:#3987e5; /* % de batería */
+    --serie-2:#d95926; /* voltaje */
+    --franja-carga:#e8efe612; --franja-lleno:#e8efe624;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   html,body{margin:0}
   body{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
     background-image:radial-gradient(1200px 600px at 80% -10%, #12241a55, transparent);}
@@ -72,7 +78,8 @@
   .section-title{font-size:12px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 2px 10px}
 
   /* ── Collar cards ── */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+  /* min(…,100%): en un teléfono de 375 px la tarjeta de 340 px no cabía y la página se desplazaba de lado */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:14px}
   .card{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:15px 16px 14px;position:relative;transition:.15s}
   .card:hover{border-color:var(--border)}
   .card.st-warn{box-shadow:inset 3px 0 0 var(--warn)} .card.st-bad{box-shadow:inset 3px 0 0 var(--bad)}
@@ -130,6 +137,95 @@
   .ev .t2{font-size:11px;color:var(--ink-faint);margin-top:1px}
   .empty{color:var(--ink-faint);font-size:12.5px;text-align:center;padding:26px 0}
   .foot{color:var(--ink-faint);font-size:11px;text-align:center;padding:22px 20px 8px}
+
+  /* ── Pestañas (2026-10-13) ── */
+  .tabs{display:flex;gap:2px;padding:0 20px;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--border-soft)}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--ink-dim);background:none;border:none;
+    border-bottom:2px solid transparent;padding:9px 14px 8px;cursor:pointer;white-space:nowrap;display:inline-flex;gap:7px;align-items:center}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+  .tab:focus-visible{outline:2px solid var(--accent-dim);outline-offset:-3px;border-radius:7px 7px 0 0}
+  .kpis{padding-top:12px}
+
+  /* ── Pestaña Energía ── */
+  .vista-pad{padding:14px 20px 40px}
+  /* En el teléfono la cabecera con los KPI ocupaba más de media pantalla pegada arriba: ahí se desplaza con la página */
+  @media(max-width:520px){ header{position:static} .vista-pad{padding:12px 14px 32px} .head-row,.tabs{padding-left:14px;padding-right:14px} }
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg button{font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--ink-dim);background:var(--panel);border:none;padding:7px 12px;cursor:pointer;white-space:nowrap}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button:hover{color:var(--ink)}
+  .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+  .e-estado{font-size:12px;color:var(--ink-faint);white-space:nowrap}
+  .e-nota{font-size:11.5px;color:var(--ink-faint);margin:-4px 2px 12px}
+  .e-banner{background:var(--warn-wash);border:1px solid #fbbf2433;color:var(--ink);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+  .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(560px,100%),1fr));gap:14px;transition:opacity .15s}
+  .egrid.recargando{opacity:.55}
+  .ecard{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:15px 16px 14px;min-width:0}
+  .ecard .c-head{margin-bottom:8px}
+  .e-hero{font-size:13px;color:var(--ink-dim);margin:0 0 4px}
+  .e-hero b{color:var(--ink);font-family:var(--mono);font-weight:600}
+  .pill.grande{font-size:13px;padding:4px 11px}
+  .e-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px 12px;margin:12px 0 4px;padding:11px 0;border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft)}
+  .e-stats .m-val{font-size:16px}
+  .e-stats .m-sub{font-size:11px;color:var(--ink-faint);margin-top:1px}
+  .e-aviso{font-size:11px;color:var(--warn);margin-top:2px}
+  .est{font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.05em;color:var(--ink-faint);border:1px solid var(--border);
+    border-radius:4px;padding:0 3px;margin-left:5px;vertical-align:2px;text-decoration:none;cursor:help}
+  .leyenda{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:11.5px;color:var(--ink-dim);margin:12px 0 2px}
+  .leyenda span{display:inline-flex;align-items:center;gap:6px}
+  .lk{display:inline-block;width:16px;height:2px;border-radius:1px;flex-shrink:0}
+  .lk-pct{background:var(--serie-1)} .lk-mv{background:var(--serie-2)}
+  .sw{display:inline-block;width:12px;height:10px;border-radius:2px;border:1px solid var(--border)}
+  .sw-carga{background:var(--franja-carga)} .sw-lleno{background:var(--franja-lleno)}
+  .pt-fin{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink-dim)}
+  .graficas{position:relative;outline:none;border-radius:8px;min-height:300px}
+  .graficas:focus-visible{box-shadow:0 0 0 2px var(--accent-dim)}
+  .g-tit{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 0;display:flex;gap:7px;align-items:center}
+  .graficas svg{display:block;max-width:100%;height:auto;touch-action:pan-y;overflow:visible}
+  .eg text{font-family:var(--sans);font-size:10.5px;fill:var(--ink-faint);font-variant-numeric:tabular-nums}
+  .eg .ty{text-anchor:end} .eg .tx{text-anchor:middle}
+  .eg .vfin{fill:var(--ink);font-family:var(--mono);font-size:11.5px;font-weight:600}
+  .eg .fr-t{fill:var(--ink-dim);font-size:9.5px;font-weight:600}
+  .eg .gy,.eg .gx{stroke:var(--border-soft);stroke-width:1}
+  .eg .gx.mayor,.eg .eje{stroke:var(--border)}
+  .eg .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .eg .fin,.eg .cruz-pt{stroke:var(--panel);stroke-width:2}
+  .eg .cruz{stroke:var(--ink-dim);stroke-width:1}
+  .eg .hit{fill:transparent;cursor:crosshair}
+  .eg .fr-carga{fill:var(--franja-carga)} .eg .fr-lleno{fill:var(--franja-lleno)}
+  .tip{position:absolute;z-index:5;pointer-events:none;background:#0b120ef5;border:1px solid var(--border);border-radius:9px;
+    padding:8px 10px;font-size:12px;min-width:160px;box-shadow:0 8px 24px #0009}
+  .tip-t{font-size:11px;color:var(--ink-faint);margin-bottom:4px}
+  .tip-r{display:flex;align-items:center;gap:7px;line-height:1.6}
+  .tip-r b{font-family:var(--mono);font-weight:600;color:var(--ink);min-width:62px}
+  .tip-r span{color:var(--ink-dim)}
+  .tip-e{color:var(--ink-dim);margin-top:3px;border-top:1px solid var(--border-soft);padding-top:4px}
+  details.e-det{margin-top:8px}
+  details.e-det summary,details.e-como summary{cursor:pointer;font-size:12px;color:var(--ink-dim);padding:4px 0}
+  details.e-det summary:hover,details.e-como summary:hover{color:var(--ink)}
+  .e-sub{font-size:12px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;font-weight:600}
+  .tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border-soft);border-radius:10px;max-width:100%}
+  .tabla-scroll.alta{max-height:340px;overflow-y:auto}
+  table.t{border-collapse:collapse;width:100%;font-size:12.5px}
+  table.t-dias{min-width:780px}
+  table.t-dias .dia{position:sticky;left:0;z-index:1;white-space:nowrap;background:var(--panel);box-shadow:1px 0 0 var(--border-soft)}
+  table.t-dias th.dia{z-index:2;background:var(--panel-2)}
+  table.t th{position:sticky;top:0;background:var(--panel-2);font-weight:600;font-size:11px;color:var(--ink-dim);text-align:left;padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:bottom}
+  table.t th small{display:block;font-weight:500;color:var(--ink-faint);font-size:10px}
+  table.t td{padding:7px 9px;border-bottom:1px solid var(--border-soft);vertical-align:top}
+  table.t tr:last-child td{border-bottom:none}
+  table.t .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.t td b{font-family:var(--mono);font-weight:600}
+  table.t .q{font-size:10.5px;color:var(--ink-faint);margin-top:1px;white-space:normal}
+  table.t .q.warn-t{color:var(--warn)}
+  .nb{display:block;margin:0 0 3px auto}
+  .e-pie{font-size:11px;color:var(--ink-faint);margin:7px 2px 0}
+  .e-error{color:var(--ink-dim);font-size:12.5px;margin:6px 0 0}
+  details.e-como{margin-top:18px;background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:8px 16px}
+  details.e-como ul{margin:6px 0 8px;padding-left:18px;color:var(--ink-dim);font-size:12.5px}
+  details.e-como li{margin:3px 0}
 </style>
 </head>
 <body data-palette="#4ade80,#fbbf24,#f87171,#38bdf8">
@@ -141,13 +237,16 @@
       <div><h1>Consola de pruebas</h1><div class="sub">Lindero · diagnóstico de campo</div></div>
     </div>
     <div class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">Conectando…</span></div>
-    <button class="btn sm" id="btn-refresh" onclick="cargar()">↻ Refrescar</button>
+    <button class="btn sm" id="btn-refresh" onclick="refrescar()">↻ Refrescar</button>
     <button class="btn sm" onclick="toggleAuto()" id="btn-auto">⏸ Auto</button>
     <a class="btn sm" href="index.html">← Panel</a>
   </div>
+  <!-- Pestañas: se arman solas desde VISTAS (script). Una pestaña nueva = una entrada en VISTAS + su <section id="vista-ID">. -->
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Secciones de la consola"></nav>
   <div class="kpis" id="kpis"></div>
 </header>
 
+<section id="vista-collares" role="tabpanel" aria-labelledby="tab-collares">
 <div class="wrap">
   <main>
     <div class="toolbar">
@@ -179,6 +278,32 @@
     </div>
   </aside>
 </div>
+</section>
+
+<section id="vista-energia" role="tabpanel" aria-labelledby="tab-energia" hidden>
+  <div class="vista-pad">
+    <div class="toolbar">
+      <span class="section-title" style="margin:0">Energía</span>
+      <div class="seg" id="e-rango" role="group" aria-label="Rango de tiempo"></div>
+      <select id="e-collar" aria-label="Collar" onchange="renderEnergia()"><option value="">Todos los collares</option></select>
+      <span class="sp"></span>
+      <span class="e-estado" id="e-estado" aria-live="polite">—</span>
+    </div>
+    <p class="e-nota" id="e-nota">% por voltaje (BAT1) · días locales · mAh y mA <b>ESTIMADOS</b> con la capacidad nominal · se actualiza cada 5 min</p>
+    <div id="e-aviso"></div>
+    <div class="egrid" id="e-grid"></div>
+    <details class="e-como">
+      <summary>Cómo se calcula el balance</summary>
+      <ul>
+        <li><b>Subió</b>: lo que sube el % mientras hay fuente (panel o USB). Incluye el salto de medir cargando y le resta la relajación del voltaje de las primeras <span id="e-relaj">3</span> h a batería.</li>
+        <li><b>Bajó</b>: lo que baja el % a batería después de esas horas. <b>Neto</b> = % al final del día − % al inicio.</li>
+        <li>Un día cuenta para el veredicto si ya terminó, hay lecturas cerca de las 00:00 y de las 24:00, cubre ≥ 80 % del día y no hubo lecturas sin celda. Si el neto cabe en ±1 punto, empata dentro del error, salvo que ese día <b>se llenó</b> (con fuente llegó a ≥ 97 %): entonces carga más, porque el neto lo topa la capacidad.</li>
+        <li><b>Gasto a batería</b>: la pendiente del % a batería ya relajado, en mA. El «±» es solo el ruido del medidor (95 %), no el sesgo del modelo. En la zona plana del voltaje (<span id="e-plana">3.66–3.92 V</span>) puede estar muy desviado: sale marcado, y la autonomía que sale de él también. Arriba de 3.82 V la marca viene de datos reales: la celda se queda en 3.86–3.90 V por horas y la curva lo lee como un gasto de pocos mA.</li>
+        <li>Los mAh y mA son <b>ESTIMADOS</b>: usan la capacidad nominal de la celda (sin medir) y 1 punto = 1 % de esa capacidad.</li>
+      </ul>
+    </details>
+  </div>
+</section>
 
 <p class="foot" id="foot">—</p>
 
@@ -224,11 +349,430 @@ function sparkline(vals,color){
     </svg><div class="spark-cap"><span>${vals.length} lecturas</span><span class="mono">${last}</span></div></div>`;
 }
 
+// ⟦ENERGIA-PURA⟧ inicio ─────────────────────────────────────────────────────────────────────────────
+// Pestañas y pestaña «Energía» (bloque CE, 2026-10-13). Todo lo de esta región es PURO: no toca el DOM ni la red,
+//  así la prueba (node tools/test_consola_energia.js) lo corre en un contexto vacío. Lo único de fuera que usa es
+//  esc(). Contrato del servidor: GET /energia/balance, docs/testing/BLOQUE_CONSOLA_ENERGIA.md (D6).
+// Para AGREGAR UNA PESTAÑA: una entrada en VISTAS, un <section id="vista-ID" role="tabpanel" hidden> en el HTML y,
+//  si carga datos, su caso en alMostrar() y tick(). La barra de pestañas se arma sola.
+const VISTAS = Object.freeze([
+  Object.freeze({ id:'collares', titulo:'Collares', icono:'▦' }),
+  Object.freeze({ id:'energia',  titulo:'Energía',  icono:'⚡' }),
+]);
+const VISTA_POR_OMISION = 'collares';
+const ENERGIA_RANGOS = Object.freeze([
+  Object.freeze({ horas:24, txt:'24 h' }), Object.freeze({ horas:72, txt:'3 días' }), Object.freeze({ horas:168, txt:'7 días' }) ]);
+const ENERGIA_HORAS_POR_OMISION = 168;
+// Los cubos del servidor son de 5 min y la salud llega cada 15: pedir más seguido no trae nada nuevo (y cada consulta
+//  le cuesta al servidor de Render, que tiene un solo hilo). Tras un error se reintenta al minuto.
+const ENERGIA_REFRESCO_MS = 5*60*1000, ENERGIA_REINTENTO_MS = 60*1000;
+// Revisión adversarial 2 (2026-10-14): datos con más de 10 min desde que los generó el servidor = «no son de ahora»
+//  (el refresco normal es cada 5 min). Sin red, sw.js responde con la copia guardada y status 200.
+const ENERGIA_VIEJO_MS = 10*60*1000;
+const MARGEN_G = Object.freeze({ l:40, r:58, t:10, b:22 });   // px: eje Y a la izquierda, valor final a la derecha
+
+// ── pestañas ──
+// La pestaña al abrir: la del enlace (#energia) gana, luego la última elegida, luego la de omisión.
+function vistaInicial(hash, guardada, vistas){
+  const ids = (vistas||[]).map(v=>v.id), h = String(hash||'').replace(/^#/, '');
+  if(ids.includes(h)) return h;
+  if(ids.includes(guardada)) return guardada;
+  return ids.includes(VISTA_POR_OMISION) ? VISTA_POR_OMISION : ids[0];
+}
+function htmlPestanas(vistas, activa){
+  return vistas.map(v=>`<button type="button" class="tab" role="tab" id="tab-${v.id}" aria-controls="vista-${v.id}" `+
+    `aria-selected="${v.id===activa}" tabindex="${v.id===activa?0:-1}" data-vista="${v.id}"><span aria-hidden="true">${v.icono}</span>${esc(v.titulo)}</button>`).join('');
+}
+function vistaVecina(vistas, actual, tecla){   // teclado de la barra (patrón «tabs» de WAI-ARIA)
+  const n = vistas.length, i = Math.max(0, vistas.findIndex(v=>v.id===actual));
+  if(tecla==='ArrowRight') return vistas[(i+1)%n].id;
+  if(tecla==='ArrowLeft')  return vistas[(i-1+n)%n].id;
+  if(tecla==='Home') return vistas[0].id;
+  if(tecla==='End')  return vistas[n-1].id;
+  return null;
+}
+function horasValidas(h){ const n = Number(h); return ENERGIA_RANGOS.some(r=>r.horas===n) ? n : ENERGIA_HORAS_POR_OMISION; }
+function htmlRangos(rangos, horas){
+  return rangos.map(r=>`<button type="button" data-horas="${r.horas}" aria-pressed="${r.horas===horas}">${esc(r.txt)}</button>`).join('');
+}
+
+// ── formatos (es-MX: «1,528» y «4.7») ──
+const esNum = v => v!=null && v!=='' && typeof v!=='boolean' && Number.isFinite(Number(v));
+function fmtNum(v, dec=1){ return esNum(v) ? Number(v).toLocaleString('es-MX', { minimumFractionDigits:dec, maximumFractionDigits:dec }) : '—'; }
+function fmtSigno(v, dec=1){   // con signo; el menos es el signo tipográfico (−), no el guion
+  if(!esNum(v)) return '—';
+  const r = Number(Number(v).toFixed(dec)), s = fmtNum(Math.abs(r), dec);
+  return r>0 ? '+'+s : r<0 ? '−'+s : s;
+}
+function fmtV(mv, dec=3){ return esNum(mv) && Number(mv)>0 ? (Number(mv)/1000).toFixed(dec)+' V' : '—'; }
+function haceDesde(ts, ahora){
+  const t = typeof ts==='number' ? ts : Date.parse(ts);
+  if(!Number.isFinite(t)) return '—';
+  const s = Math.max(0, (ahora-t)/1000);
+  if(s<60) return `hace ${Math.round(s)} s`;
+  if(s<3600) return `hace ${Math.round(s/60)} min`;
+  if(s<86400) return `hace ${fmtNum(s/3600, s<36000?1:0)} h`;
+  return `hace ${fmtNum(s/86400, 1)} días`;
+}
+function fmtAutonomia(h){ if(!esNum(h)) return '—'; const n = Number(h); return n<48 ? `≈ ${fmtNum(n,0)} h` : `≈ ${fmtNum(n/24,1)} días`; }
+const _FORMATOS = {};
+function fmtTiempo(t, zona, tipo){
+  const k = zona+'|'+tipo;
+  if(!_FORMATOS[k]){
+    const o = tipo==='dia' ? { weekday:'short', day:'numeric' } : tipo==='hora' ? { hour:'2-digit', minute:'2-digit', hourCycle:'h23' }
+            : tipo==='fecha' ? { weekday:'short', day:'numeric', month:'short' }
+            : { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hourCycle:'h23' };
+    try{ _FORMATOS[k] = new Intl.DateTimeFormat('es-MX', { timeZone:zona, ...o }); }
+    catch(e){ _FORMATOS[k] = new Intl.DateTimeFormat('es-MX', o); }   // zona desconocida: la del navegador
+  }
+  return _FORMATOS[k].format(t);
+}
+function fmtFecha(fecha){   // 'AAAA-MM-DD' (día local que ya calculó el servidor) → 'mar 13 de oct'
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha||''));
+  return m ? fmtTiempo(Date.UTC(+m[1], +m[2]-1, +m[3], 12), 'UTC', 'fecha') : String(fecha||'—');
+}
+// La marca ESTIMADO sale de la lista `estimados` de la respuesta, no de una lista propia.
+function etqEst(r, campo){
+  return (r && Array.isArray(r.estimados) && r.estimados.includes(campo))
+    ? `<abbr class="est" title="ESTIMADO: usa la capacidad nominal de la celda (${fmtNum(r.capacidad_mah,0)} mAh), sin medir">ESTIMADO</abbr>` : '';
+}
+function textoNotaEnergia(r){
+  return `% por voltaje (BAT1) · días locales de ${r.zona} · mAh y mA ESTIMADOS con ${fmtNum(r.capacidad_mah,0)} mAh nominales `+
+    `(1 punto = ${fmtNum(r.capacidad_mah/100,0)} mAh) · se actualiza cada ${Math.round(ENERGIA_REFRESCO_MS/60000)} min`;
+}
+// La zona plana del voltaje sale de la respuesta (revisión adversarial 2, 2026-10-14: se amplió a 3.92 V con datos
+//  reales; antes el límite de arriba, 3.82 V, estaba escrito a mano). Sin el campo (servidor viejo), null: se deja el texto fijo.
+function textoZonaPlana(r){
+  const z = r && Array.isArray(r.zona_plana_mv) && r.zona_plana_mv.length===2 && r.zona_plana_mv.every(esNum) ? r.zona_plana_mv : null;
+  return z ? `${(z[0]/1000).toFixed(2)}–${(z[1]/1000).toFixed(2)} V` : null;
+}
+
+// ── antigüedad y rango de lo que se ve (revisión adversarial 2, 2026-10-14) ──
+// La hora de los datos es la del servidor (`generado`), no la del fetch: sin red, sw.js entrega la copia guardada
+//  con status 200 y antes la pestaña decía «datos de hace 0 s» aunque fuera de hace horas. Sin `generado`, la del fetch.
+function tsDeRespuesta(d, respaldo){ const t = Date.parse(d && d.generado); return Number.isFinite(t) ? t : respaldo; }
+function textoRango(h){ const r = ENERGIA_RANGOS.find(x=>x.horas===Number(h)); return r ? r.txt : `${fmtNum(h,0)} h`; }
+// o: { error, hayDatos, ts, cache, horasDatos, horasPedidas, cargando, ahora, zona }. cache = la respuesta trajo
+//  X-Lindero-Cache (la copia del service worker, sin red). Devuelve los avisos (texto plano; se escapan al pintar).
+function avisosEnergia(o){
+  const out = [], hace = haceDesde(o.ts, o.ahora);
+  // Si falló el cambio de rango (7 días → 24 h con 500/429/sin red), el botón marca lo pedido (es lo que se reintenta)
+  //  y aquí se dice de qué rango son los datos que se ven.
+  const otroRango = !!o.hayDatos && esNum(o.horasDatos) && Number(o.horasDatos)!==Number(o.horasPedidas);
+  const queSeVe = otroRango ? `Se muestran los datos de ${textoRango(o.horasDatos)} (${hace}), no los de ${textoRango(o.horasPedidas)}.`
+                            : `Se muestra lo de ${hace}.`;
+  if(o.error) out.push(o.hayDatos ? `${o.error} ${queSeVe}` : String(o.error));
+  else if(otroRango && !o.cargando) out.push(queSeVe);
+  if(!o.error && o.hayDatos){
+    const cuando = esNum(o.ts) ? ` (los generó el servidor el ${fmtTiempo(o.ts, o.zona||'UTC', 'completa')})` : '';
+    if(o.cache) out.push(`Sin conexión: se muestran datos guardados de ${hace}${cuando}. No son de ahora.`);
+    else if(esNum(o.ts) && o.ahora - o.ts > ENERGIA_VIEJO_MS) out.push(`Los datos son de ${hace}${cuando}: no son de ahora.`);
+  }
+  return out;
+}
+function textoEstadoEnergia(o){
+  const otroRango = !!o.hayDatos && esNum(o.horasDatos) && Number(o.horasDatos)!==Number(o.horasPedidas);
+  if(o.cargando) return 'Actualizando…' + (otroRango ? ` (se ven los de ${textoRango(o.horasDatos)})` : '');
+  if(!o.hayDatos) return o.error ? '⚠ sin datos' : '—';
+  const viejo = esNum(o.ts) && o.ahora - o.ts > ENERGIA_VIEJO_MS;
+  return `${o.error ? '⚠ sin actualizar · ' : o.cache ? '⚠ sin conexión · ' : viejo ? '⚠ ' : ''}datos${o.cache ? ' guardados' : ''} de ${haceDesde(o.ts, o.ahora)}`;
+}
+
+// ── estados (icono + etiqueta; el color de estado nunca va solo) ──
+const VEREDICTOS = Object.freeze({
+  carga_mas: Object.freeze({ k:'ok',   ic:'▲', txt:'Carga más de lo que gasta', corto:'Carga más' }),
+  gasta_mas: Object.freeze({ k:'warn', ic:'▼', txt:'Gasta más de lo que carga', corto:'Gasta más' }),
+  sin_datos: Object.freeze({ k:'mute', ic:'○', txt:'Sin datos suficientes',     corto:'Sin datos' }),
+});
+const veredictoDe = v => VEREDICTOS[v] || VEREDICTOS.sin_datos;
+function cargadorDe(c){   // carga: 0 alimentado, 1 cargando, 2 a batería
+  const n = esNum(c) ? Number(c) : null;
+  return n===1 ? { ic:'⚡', txt:'Cargando' } : n===0 ? { ic:'✓', txt:'Alimentado (lleno)' } : n===2 ? { ic:'🔋', txt:'A batería' } : { ic:'·', txt:'Sin dato' };
+}
+function fuenteDe(f){    // la de `actual` es número (0 ninguna, 1 panel, 2 USB); la de las franjas, texto
+  if(f==='panel' || f===1) return { ic:'☀', txt:'Panel' };
+  if(f==='usb' || f===2)   return { ic:'🔌', txt:'USB' };
+  if(f==='ninguna' || f===0) return { ic:'○', txt:'Ninguna' };
+  return { ic:'·', txt:'Sin dato' };
+}
+
+// ── la serie ──
+function valorDe(p, campo){   // pct −1 = sin celda (mv null): no es un valor
+  if(!p) return null;
+  if(campo==='pct') return esNum(p.pct) && Number(p.pct)>=0 ? Number(p.pct) : null;
+  return esNum(p.mv) && Number(p.mv)>0 ? Number(p.mv) : null;
+}
+// La serie llega decimada a `paso_min`: dos puntos seguidos pueden quedar hasta un paso más lejos de lo que estaban
+//  los cubos. Por eso el corte es hueco_max_min + paso_min (35 min a 24 h, 50 a 7 días); un hueco de verdad (gateway
+//  caído horas) se corta siempre.
+function huecoSerieMs(r){
+  const h = esNum(r && r.hueco_max_min) ? Number(r.hueco_max_min) : 30, p = esNum(r && r.paso_min) ? Number(r.paso_min) : 5;
+  return (h + p) * 60e3;
+}
+function segmentosDe(serie, campo, maxGapMs){
+  const segs = []; let cur = null, tPrev = null;
+  for(const p of serie||[]){
+    const v = valorDe(p, campo);
+    if(v==null || !esNum(p.t)){ cur = null; continue; }   // sin celda: también corta la línea
+    if(!cur || p.t - tPrev > maxGapMs){ cur = []; segs.push(cur); }
+    cur.push({ t:p.t, v }); tPrev = p.t;
+  }
+  return segs;
+}
+function indiceCercano(serie, t){
+  const n = (serie||[]).length; if(!n) return -1;
+  let lo = 0, hi = n-1;
+  while(lo<hi){ const m = (lo+hi)>>1; if(serie[m].t < t) lo = m+1; else hi = m; }
+  return lo>0 && Math.abs(serie[lo-1].t - t) <= Math.abs(serie[lo].t - t) ? lo-1 : lo;
+}
+function franjaEn(franjas, t){ return (franjas||[]).find(f=>t>=f.desde && t<=f.hasta) || null; }
+function pasoLimpio(rango, n){
+  const crudo = rango/Math.max(1,n), e = Math.pow(10, Math.floor(Math.log10(crudo))), f = crudo/e;
+  return (f<=1 ? 1 : f<=2 ? 2 : f<=5 ? 5 : 10) * e;
+}
+// % fijo de 0 a 100 (se compara de un vistazo entre collares); el voltaje se acerca a los datos con un margen,
+//  con un mínimo de 100 mV para que el ruido de ±7 mV no parezca una montaña.
+function dominioDe(serie, campo){
+  if(campo==='pct') return { v0:0, v1:100, paso:25 };
+  const vs = (serie||[]).map(p=>valorDe(p,'mv')).filter(v=>v!=null);
+  if(!vs.length) return { v0:3400, v1:4200, paso:200 };
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  if(hi-lo < 100){ const c = (lo+hi)/2; lo = c-50; hi = c+50; }
+  const pad = (hi-lo)*0.04; lo -= pad; hi += pad;
+  const paso = pasoLimpio(hi-lo, 4);
+  return { v0:Math.floor(lo/paso)*paso, v1:Math.ceil(hi/paso)*paso, paso };
+}
+function ticksY(dom){
+  const out = [];
+  for(let k = 0; dom.v0 + k*dom.paso <= dom.v1 + dom.paso*1e-6; k++) out.push(Math.round((dom.v0 + k*dom.paso)*1000)/1000);
+  return out;
+}
+function geometria({ desde, hasta, ancho, alto, dom, m = MARGEN_G }){
+  const x0 = m.l, x1 = Math.max(m.l+20, ancho-m.r), y0 = m.t, y1 = Math.max(m.t+20, alto-m.b);
+  const span = Math.max(1, hasta-desde), rango = (dom.v1-dom.v0) || 1;
+  return { x0, x1, y0, y1, desde, hasta, ancho, alto, v0:dom.v0, v1:dom.v1,
+    x: t => x0 + (t-desde)/span*(x1-x0), y: v => y1 - (v-dom.v0)/rango*(y1-y0), t: px => desde + (px-x0)/(x1-x0)*span };
+}
+// Marcas de tiempo alineadas a la medianoche local (la del primer día del servidor: sin horario de verano, sumar horas
+//  basta). El paso sale del ancho: una etiqueta cada ≥ 50 px («mié 14» mide ~36).
+function ticksTiempo({ desde, hasta, medianoche, anchoPlot, zona }){
+  const H = 3600e3, span = (hasta-desde)/H, caben = Math.max(2, Math.floor(anchoPlot/50));
+  const paso = [1,2,3,6,12,24,48,72].find(p=>span/p <= caben) || 168;
+  const base = esNum(medianoche) ? Number(medianoche) : Math.floor(desde/H)*H;
+  const out = [];
+  for(let k = Math.ceil((desde-base)/(paso*H)); base + k*paso*H <= hasta; k++){
+    const t = base + k*paso*H, mayor = Math.round((t-base)/H) % 24 === 0;
+    out.push({ t, mayor, etiqueta: fmtTiempo(t, zona, mayor ? 'dia' : 'hora') });
+  }
+  // Si las etiquetas van cada 2 o 3 días (teléfono), cada medianoche lleva igual su línea, sin texto: así se ven los
+  //  días del balance.
+  if(paso > 24) for(let k = Math.ceil((desde-base)/(24*H)); base + k*24*H <= hasta; k++){
+    const t = base + k*24*H; if(!out.some(o=>o.t===t)) out.push({ t, mayor:true, etiqueta:'' });
+  }
+  return out.sort((a,b)=>a.t-b.t);
+}
+
+// ── las gráficas (SVG propio; la CSP no deja scripts de fuera) ──
+const r1 = v => Math.round(v*10)/10;
+function svgGrafica({ campo, serie, franjas, geo, dom, ticksX, maxGapMs, etiqueta, titulo }){
+  const W = geo.ancho, H = geo.alto, color = campo==='pct' ? 'var(--serie-1)' : 'var(--serie-2)';
+  const fmtY = campo==='pct' ? v=>fmtNum(v,0) : v=>(v/1000).toFixed(dom.paso>=100 ? 1 : 2);
+  const p = [`<svg class="eg" data-campo="${campo}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titulo)}">`];
+  for(const fr of franjas||[]){   // franjas con fuente, detrás de todo
+    const a = Math.max(geo.x0, geo.x(fr.desde)), b = Math.min(geo.x1, geo.x(fr.hasta));
+    if(!(b > a)) continue;
+    p.push(`<rect class="fr ${fr.estado==='alimentado' ? 'fr-lleno' : 'fr-carga'}" x="${r1(a)}" y="${geo.y0}" width="${r1(Math.max(1, b-a))}" height="${geo.y1-geo.y0}"/>`);
+    if(fr.fuente==='usb' && b-a >= 28) p.push(`<text class="fr-t" x="${r1(a+4)}" y="${geo.y0+11}">USB</text>`);
+  }
+  for(const v of ticksY(dom)){
+    const y = r1(geo.y(v));
+    p.push(`<line class="gy" x1="${geo.x0}" x2="${geo.x1}" y1="${y}" y2="${y}"/><text class="ty" x="${geo.x0-6}" y="${r1(y+3.5)}">${fmtY(v)}</text>`);
+  }
+  for(const tk of ticksX){
+    const x = r1(geo.x(tk.t));
+    p.push(`<line class="gx${tk.mayor ? ' mayor' : ''}" x1="${x}" x2="${x}" y1="${geo.y0}" y2="${geo.y1}"/>`+
+      (tk.etiqueta ? `<text class="tx" x="${x}" y="${H-6}">${esc(tk.etiqueta)}</text>` : ''));
+  }
+  p.push(`<line class="eje" x1="${geo.x0}" x2="${geo.x1}" y1="${geo.y1}" y2="${geo.y1}"/>`);
+  const segs = segmentosDe(serie, campo, maxGapMs);
+  for(const s of segs){
+    if(s.length===1){ p.push(`<circle class="ln-pt" cx="${r1(geo.x(s[0].t))}" cy="${r1(geo.y(s[0].v))}" r="1.6" fill="${color}"/>`); continue; }
+    p.push(`<polyline class="ln" stroke="${color}" points="${s.map(q=>r1(geo.x(q.t))+','+r1(geo.y(q.v))).join(' ')}"/>`);
+  }
+  const uS = segs[segs.length-1], ult = uS ? uS[uS.length-1] : null;
+  if(ult){   // el último dato: punto resaltado y su valor, en tinta (no en el color de la serie)
+    const x = r1(geo.x(ult.t)), y = r1(geo.y(ult.v));
+    p.push(`<circle class="fin" cx="${x}" cy="${y}" r="4" fill="${color}"/>`+
+      `<text class="vfin" x="${r1(x+8)}" y="${r1(Math.min(geo.y1, Math.max(geo.y0+8, y+4)))}">${esc(etiqueta(ult.v))}</text>`);
+  }
+  // La retícula del cursor (la mueve el pegamento) y la zona que recibe el puntero: todo el alto, no solo la línea.
+  p.push(`<line class="cruz" x1="0" x2="0" y1="${geo.y0}" y2="${geo.y1}" visibility="hidden"/>`+
+    `<circle class="cruz-pt" cx="0" cy="0" r="4" fill="${color}" visibility="hidden"/>`+
+    `<rect class="hit" x="${geo.x0}" y="0" width="${r1(geo.x1-geo.x0)}" height="${H}"/></svg>`);
+  return p.join('');
+}
+const GRAFICAS = Object.freeze([
+  Object.freeze({ campo:'pct', alto:150, titulo:'% de batería (BAT1, por voltaje)', etq: v=>fmtNum(v,0)+' %' }),
+  Object.freeze({ campo:'mv',  alto:130, titulo:'Voltaje de la celda',              etq: v=>fmtV(v) }),
+]);
+function htmlGraficas(dev, c, r, ancho){
+  const serie = (c && c.serie) || [];
+  if(!serie.some(p=>valorDe(p,'pct')!=null || valorDe(p,'mv')!=null))
+    return { html:'<p class="empty">Sin lecturas de batería en esta ventana.</p>', geos:null };
+  const desde = Date.parse(r.desde), hasta = Date.parse(r.generado);
+  const medianoche = c.dias && c.dias.length ? Date.parse(c.dias[0].desde) : null;
+  const geos = {}, partes = [];
+  for(const g of GRAFICAS){
+    const dom = dominioDe(serie, g.campo), geo = geometria({ desde, hasta, ancho, alto:g.alto, dom });
+    const vals = serie.map(p=>valorDe(p, g.campo)).filter(v=>v!=null);
+    const titulo = `${g.titulo} de ${dev}` + (vals.length ? `: de ${g.etq(vals[0])} a ${g.etq(vals[vals.length-1])} en ${r.horas} h` : ': sin datos');
+    geos[g.campo] = geo;
+    partes.push(`<div class="g-tit"><i class="lk lk-${g.campo}"></i>${esc(g.titulo)}</div>` +
+      svgGrafica({ campo:g.campo, serie, franjas:c.franjas, geo, dom, maxGapMs:huecoSerieMs(r), etiqueta:g.etq, titulo,
+                   ticksX:ticksTiempo({ desde, hasta, medianoche, anchoPlot:geo.x1-geo.x0, zona:r.zona }) }));
+  }
+  return { html: partes.join('') + '<div class="tip" role="status" hidden></div>', geos };
+}
+function htmlTip(p, fr, zona){
+  if(!p) return '';
+  const pct = valorDe(p,'pct'), mv = valorDe(p,'mv'), cg = cargadorDe(p.carga), fu = fr ? fuenteDe(fr.fuente) : null;
+  return `<div class="tip-t">${esc(fmtTiempo(p.t, zona, 'completa'))}</div>`+
+    `<div class="tip-r"><i class="lk lk-pct"></i><b>${pct==null ? (p.pct===-1 ? 'sin celda' : '—') : fmtNum(pct,0)+' %'}</b><span>% de batería</span></div>`+
+    `<div class="tip-r"><i class="lk lk-mv"></i><b>${fmtV(mv)}</b><span>voltaje</span></div>`+
+    `<div class="tip-e">${cg.ic} ${esc(cg.txt)}${fu && fu.txt!=='Sin dato' ? ` · ${fu.ic} ${esc(fu.txt)}` : ''}</div>`;
+}
+function htmlTablaSerie(serie, zona){   // la tabla alternativa de las dos gráficas (lo más nuevo arriba)
+  const filas = [...(serie||[])].reverse().map(p=>{
+    const pct = valorDe(p,'pct'), cg = cargadorDe(p.carga);
+    return `<tr><td>${esc(fmtTiempo(p.t, zona, 'completa'))}</td><td class="n">${pct==null ? (p.pct===-1 ? 'sin celda' : '—') : fmtNum(pct,0)+' %'}</td>`+
+      `<td class="n">${fmtV(valorDe(p,'mv'))}</td><td>${cg.ic} ${esc(cg.txt)}</td></tr>`;
+  }).join('');
+  return `<div class="tabla-scroll alta"><table class="t t-serie"><thead><tr><th>Hora</th><th class="n">% de batería</th>`+
+    `<th class="n">Voltaje</th><th>Cargador</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
+// ── el balance diario ──
+function barraNeto(v, maxAbs){   // barra divergente chica: a la derecha sube, a la izquierda baja (el texto lleva el signo)
+  if(!esNum(v)) return '';
+  const w = Math.min(28, Math.abs(v)/Math.max(1e-9, maxAbs)*28), x = v>=0 ? 30 : 30-w;
+  return `<svg class="nb" width="60" height="8" viewBox="0 0 60 8" aria-hidden="true"><line x1="30" x2="30" y1="0" y2="8" stroke="var(--ink-faint)" stroke-width="1"/>`+
+    `<rect x="${r1(x)}" y="1" width="${r1(Math.max(w, 0.5))}" height="6" rx="1.5" fill="var(--serie-1)"/></svg>`;
+}
+function pctMah(p, m){ return esNum(p) ? `<b>${fmtSigno(p)} %</b><div class="q">${fmtSigno(m,0)} mAh</div>` : '—'; }
+function textoGasto(o){   // o: un día o el resumen
+  if(!esNum(o.gasto_ma)) return null;
+  return `${fmtNum(o.gasto_ma)}${esNum(o.gasto_ruido_ma) ? ' ± '+fmtNum(o.gasto_ruido_ma) : ''} mA`;
+}
+function htmlTablaDias(c, r){
+  const dias = (c && c.dias) || [];
+  if(!dias.length) return '<p class="empty">Sin días en esta ventana.</p>';
+  const maxAbs = Math.max(1, ...dias.map(d=>esNum(d.neto_pct) ? Math.abs(d.neto_pct) : 0));
+  const filas = [...dias].reverse().map(d=>{   // lo más nuevo arriba
+    const v = veredictoDe(d.veredicto), h = d.horas || {}, aj = d.ajustes || {};
+    const enCurso = !d.completo && /en curso/.test(d.motivo||'');
+    const ajTxt = [['saltos', aj.saltos_pct], ['relajación', aj.relajacion_pct]].filter(([,x])=>esNum(x) && Math.abs(x)>=0.05)
+      .map(([n,x])=>`${n} ${fmtSigno(x)}`).join(' · ');
+    const gasto = textoGasto(d);
+    // Columnas: primero la respuesta (neto y veredicto), luego de dónde sale. En el teléfono la tabla se desplaza
+    //  de lado con el día fijo a la izquierda.
+    return `<tr data-fecha="${esc(d.fecha)}">`+
+      `<td class="dia"><b>${esc(fmtFecha(d.fecha))}</b>${enCurso ? '<div class="q">hoy, en curso</div>' : ''}`+
+        `${esNum(h.sin_dato) && h.sin_dato>0 ? `<div class="q">${fmtNum(h.sin_dato)} h sin dato</div>` : ''}</td>`+
+      `<td class="n">${barraNeto(d.neto_pct, maxAbs)}${pctMah(d.neto_pct, d.neto_mah)}`+
+        `${esNum(aj.huecos_pct) && Math.abs(aj.huecos_pct)>=0.05 ? `<div class="q">huecos ${fmtSigno(aj.huecos_pct)}</div>` : ''}</td>`+
+      `<td><span class="pill ${v.k}">${v.ic} ${v.corto}</span>`+
+        `${d.veredicto==='sin_datos' && d.motivo ? `<div class="q">${esc(d.motivo)}</div>` : ''}`+
+        // Un día que se llenó tiene el neto topado: lo que decide es eso, no el margen de error.
+        `${d.lleno ? '<div class="q">se llenó: el neto lo topa la capacidad</div>' : ''}`+
+        `${d.dentro_del_error && !d.lleno && d.veredicto!=='sin_datos' && esNum(d.neto_pct) ? `<div class="q">≈ dentro del error (±${fmtNum(r.margen_pct,0)} punto)</div>` : ''}</td>`+
+      `<td class="n">${pctMah(d.subio_pct, d.subio_mah)}${ajTxt ? `<div class="q">incl. ${ajTxt}</div>` : ''}</td>`+
+      `<td class="n">${pctMah(esNum(d.bajo_pct) ? -d.bajo_pct : null, esNum(d.bajo_mah) ? -d.bajo_mah : null)}</td>`+
+      `<td class="n">${fmtNum(h.con_fuente)} h${esNum(h.alimentado) && h.alimentado>0 ? `<div class="q">lleno ${fmtNum(h.alimentado)} h</div>` : ''}</td>`+
+      `<td class="n">${fmtNum(h.a_bateria)} h</td>`+
+      `<td class="n">${gasto ? `<b>${gasto}</b>` : `<span title="${esc(d.gasto_motivo||'')}">—</span>`}`+
+        `${gasto && d.gasto_zona_plana ? `<div class="q warn-t" title="${esc(d.gasto_aviso||'')}">⚠ zona plana</div>` : ''}</td></tr>`;
+  }).join('');
+  return `<div class="tabla-scroll"><table class="t t-dias"><thead><tr><th class="dia">Día</th>`+
+    `<th class="n">Neto<small>% · mAh ${etqEst(r,'dias[].neto_mah')}</small></th><th>Veredicto</th>`+
+    `<th class="n">Subió<small>% · mAh ${etqEst(r,'dias[].subio_mah')}</small></th><th class="n">Bajó<small>% · mAh ${etqEst(r,'dias[].bajo_mah')}</small></th>`+
+    `<th class="n">Con fuente</th><th class="n">A batería</th><th class="n">Gasto a batería<small>mA ${etqEst(r,'dias[].gasto_ma')}</small></th>`+
+    `</tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
+// ── la tarjeta de un collar ──
+function htmlResumenEnergia(c, r, ahora){
+  const s = c.resumen || {}, v = veredictoDe(s.veredicto);
+  let txt;
+  if(s.veredicto==='sin_datos' || !esNum(s.neto_medio_pct_dia)) txt = 'Ningún día completo en esta ventana: mira el día en curso en la tabla.';
+  else {
+    const dias = s.veredicto==='carga_mas' ? `cargó más ${s.dias_carga_mas} de ${s.dias_completos}` : `gastó más ${s.dias_gasta_mas} de ${s.dias_completos}`;
+    txt = `Neto medio <b>${fmtSigno(s.neto_medio_pct_dia)} % al día</b> (${fmtSigno(s.neto_medio_mah_dia,0)} mAh${etqEst(r,'resumen.neto_medio_mah_dia')}) · ${dias} días completos`+
+      (s.se_llena ? ` · se llenó ${fmtNum(s.dias_llenos,0)} de ${fmtNum(s.dias_completos,0)} días: el neto lo topa la capacidad`
+        : s.dentro_del_error ? ` · ≈ dentro del error (±${fmtNum(r.margen_pct,0)} punto): prácticamente empata` : '');
+  }
+  return { pill:`<span class="pill ${v.k} grande">${v.ic} ${v.txt}</span>`, txt };
+}
+function htmlStatsEnergia(c, r, ahora){
+  const a = c.actual || {}, s = c.resumen || {}, cg = cargadorDe(a.carga), fu = fuenteDe(a.fuente);
+  const gasto = textoGasto(s);
+  // «Ahora» es el % del tablero (BAT1 con las últimas lecturas); la serie filtra en cubos de 5 min, va más suave y
+  //  puede ir unos minutos atrás (documento, D2). Si difieren a la vista, se dice para que no parezca un error.
+  const vals = (c.serie||[]).map(p=>valorDe(p,'pct')).filter(v=>v!=null), ultSerie = vals.length ? vals[vals.length-1] : null;
+  const difiere = esNum(a.pct) && a.pct>=0 && ultSerie!=null && Math.abs(a.pct-ultSerie) >= 2;
+  const m = (lbl, val, sub) => `<div class="m"><div class="m-lbl">${lbl}</div><div class="m-val">${val}</div>${sub ? `<div class="m-sub">${sub}</div>` : ''}</div>`;
+  return `<div class="e-stats">`+
+    m('Batería ahora', esNum(a.pct) && a.pct>=0 ? `${fmtNum(a.pct,0)}<span class="q">%</span>` : (a.pct===-1 ? 'sin celda' : '—'),
+      `${fmtV(a.mv)}${a.ts ? ' · '+haceDesde(a.ts, ahora) : ''}${a.origen && a.origen!=='voltaje' ? ' · % del modelo' : ''}`+
+      `${difiere ? `<div>la gráfica, más suavizada, marca ${fmtNum(ultSerie,0)} %</div>` : ''}`)+
+    m('Cargador', `${cg.ic} ${esc(cg.txt)}`, a.incoherente ? '<span class="e-aviso">⚠ dice cargando sin fuente (/CHG y /PGOOD se contradicen)</span>' : (a.ts ? haceDesde(a.ts, ahora) : ''))+
+    m('Fuente', `${fu.ic} ${esc(fu.txt)}`, a.fuente_ts ? 'salud '+haceDesde(a.fuente_ts, ahora) : 'sin salud reciente')+
+    m(`Gasto a batería${etqEst(r,'resumen.gasto_ma')}`, gasto ? esc(gasto) : '—',
+      gasto ? `sin sol, ${fmtNum(s.gasto_horas)} h a batería${s.gasto_zona_plana
+        ? `<div class="e-aviso" title="${esc(s.gasto_aviso||'')}">⚠ zona plana del voltaje: puede estar muy desviado</div>` : ''}`
+            : esc(s.gasto_motivo||''))+
+    // Revisión adversarial 2 (2026-10-14): la autonomía sale del gasto; si el gasto está en la zona plana, ella también
+    //  lleva la marca (MENA-0001 real: 9.7 mA y «26 días» en la meseta de 3.86–3.89 V).
+    m(`Autonomía sin sol${etqEst(r,'resumen.autonomia_h')}`, esc(fmtAutonomia(s.autonomia_h)), esNum(s.autonomia_h) ? `del % de ahora al 0 % (${fmtNum(s.autonomia_h,0)} h)`+
+      `${s.autonomia_zona_plana ? `<div class="e-aviso" title="${esc(s.autonomia_aviso||'')}">⚠ zona plana del voltaje: puede estar muy desviada</div>` : ''}` : '')+
+    `</div>`;
+}
+function htmlTarjetaEnergia(dev, c, r, op = {}){
+  const ahora = esNum(op.ahora) ? op.ahora : Date.parse(r.generado), abiertos = op.abiertos || new Set();
+  const cab = `<div class="c-head"><div><div class="c-name">${esc(dev)}</div>${op.nombre ? `<div class="c-dev">${esc(op.nombre)}</div>` : ''}</div>`;
+  if(!c || c.error) return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right"><span class="pill mute">○ Sin cálculo</span></div></div>`+
+    `<p class="e-error">⚠ ${esc((c && c.error) || 'el servidor no mandó datos de este collar')}</p></article>`;
+  const res = htmlResumenEnergia(c, r, ahora), n = (c.serie||[]).length, k = 'serie:'+dev;
+  return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right">${res.pill}</div></div>`+
+    `<p class="e-hero">${res.txt}</p>`+
+    htmlStatsEnergia(c, r, ahora)+
+    `<div class="leyenda"><span><i class="lk lk-pct"></i>% de batería</span><span><i class="lk lk-mv"></i>Voltaje</span>`+
+      `<span><i class="sw sw-carga"></i>Con fuente, cargando</span><span><i class="sw sw-lleno"></i>Con fuente, lleno</span><span><i class="pt-fin"></i>Último dato</span></div>`+
+    `<div class="graficas" data-dev="${esc(dev)}" tabindex="0" aria-label="Gráficas de ${esc(dev)}. Con las flechas izquierda y derecha se recorren los puntos."></div>`+
+    `<details class="e-det" data-k="${esc(k)}"${abiertos.has(k) ? ' open' : ''}><summary>Ver los datos de las gráficas en tabla (${n} puntos)</summary><div class="det-cuerpo"></div></details>`+
+    `<h3 class="e-sub">Balance diario</h3>${htmlTablaDias(c, r)}`+
+    `<p class="e-pie">Días de ${esc(r.zona)}. «Subió» incluye los saltos de medir cargando y resta la relajación de las primeras ${fmtNum(r.relajacion_h,0)} h a batería; el neto no cambia.</p>`+
+    `</article>`;
+}
+function textoErrorEnergia(e){
+  const s = String(e && e.message || e || '');
+  if(s==='401' || s==='403') return 'La sesión expiró o no vale: vuelve a entrar en el Panel.';
+  if(s==='404') return 'El servidor todavía no tiene GET /energia/balance (falta desplegar el bloque CE).';
+  if(s==='429') return 'El servidor está limitando las peticiones (429): espera unos minutos.';
+  return `No se pudo traer la energía del servidor (${s || 'error de red'}).`;
+}
+// ⟦ENERGIA-PURA⟧ fin ─────────────────────────────────────────────────────────────────────────────────
+
 // ── carga de datos ──
+// (En modo simulado, tools/servir_tablero.js reescribe esta línea para entrar con la sesión de prueba: que siga en una línea.)
 function leerToken(){ try{ return localStorage.getItem('lindero_token'); }catch(e){ return null; } }
-async function api(path){
+// meta (opcional, revisión adversarial 2, 2026-10-14): si se pasa un objeto, api() le pone `cache` = true cuando la
+//  respuesta es la copia guardada de sw.js (sin red responde 200 con la cabecera X-Lindero-Cache). Los demás llamadores
+//  no pasan nada y no cambian.
+async function api(path, meta){
   const r = await fetch(API_BASE+path, { headers:{ 'Authorization':'Bearer '+TOKEN } });
-  if(!r.ok) throw new Error(r.status); return r.json();
+  if(!r.ok) throw new Error(r.status);
+  if(meta) meta.cache = !!(r.headers && typeof r.headers.get==='function' && r.headers.get('X-Lindero-Cache'));
+  return r.json();
 }
 async function cargar(){
   TOKEN = leerToken();
@@ -368,7 +912,169 @@ function exportarCSV(dev){
   a.href=u; a.download=`estado_collares_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
 }
 function toggleAuto(){ AUTO=!AUTO; document.getElementById('btn-auto').textContent=AUTO?'⏸ Auto':'▶ Auto'; programarAuto(); }
-function programarAuto(){ clearInterval(autoTimer); if(AUTO) autoTimer=setInterval(cargar, 10000); }
+// Cada 10 s se refresca SOLO la pestaña visible (Energía decide si ya le toca: cada 5 min).
+function programarAuto(){ clearInterval(autoTimer); if(AUTO) autoTimer=setInterval(tick, 10000); }
+function tick(){ if(document.hidden) return; if(VISTA==='energia') cargarEnergia(); else cargar(); }
+function refrescar(){ if(VISTA==='energia') cargarEnergia({forzar:true}); else cargar(); }
+
+// ══ Pestañas y pestaña Energía: el pegamento (DOM y red). La lógica está en ⟦ENERGIA-PURA⟧. ══
+const CLAVE_VISTA='lindero_consola_vista', CLAVE_HORAS='lindero_consola_energia_horas';
+function leerLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function guardarLS(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+let VISTA = VISTA_POR_OMISION;
+// ts: hora del servidor de los datos que se ven (`generado`); cache: vinieron de la copia de sw.js (sin red).
+const ENERGIA = { datos:null, horasDatos:null, ts:0, cache:false, horas:horasValidas(leerLS(CLAVE_HORAS)), error:null, cargando:false,
+  pedido:0, tsIntento:0, horasIntento:null, abiertos:new Set(), geos:{}, anchoPintado:0 };
+
+function mostrarVista(id, {guardar=true, foco=false}={}){
+  id = vistaInicial(id, null, VISTAS);
+  VISTA = id;
+  for(const v of VISTAS){
+    const b=document.getElementById('tab-'+v.id), p=document.getElementById('vista-'+v.id), on=v.id===id;
+    if(b){ b.setAttribute('aria-selected', String(on)); b.tabIndex = on?0:-1; }
+    if(p) p.hidden = !on;
+  }
+  document.getElementById('kpis').hidden = id!=='collares';   // los KPI son de los collares
+  if(guardar){ guardarLS(CLAVE_VISTA, id); try{ history.replaceState(null, '', '#'+id); }catch(e){} }
+  if(foco){ const b=document.getElementById('tab-'+id); if(b) b.focus(); }
+  alMostrar(id);
+}
+function alMostrar(id){ if(id==='collares') cargar(); else if(id==='energia') cargarEnergia(); }
+
+async function cargarEnergia({forzar=false}={}){
+  // La copia guardada (sin red) se reintenta como un error: al minuto, no a los 5 (revisión adversarial 2, 2026-10-14).
+  const espera = ENERGIA.error || ENERGIA.cache ? ENERGIA_REINTENTO_MS : ENERGIA_REFRESCO_MS;
+  const vigente = ENERGIA.horasIntento===ENERGIA.horas && (Date.now()-ENERGIA.tsIntento) < espera;
+  if(!forzar && (vigente || ENERGIA.cargando)){ actualizarEstadoEnergia(); pintarGraficasSiCambio(); return; }
+  TOKEN = leerToken();
+  ENERGIA.tsIntento = Date.now(); ENERGIA.horasIntento = ENERGIA.horas;
+  if(!TOKEN){
+    ENERGIA.datos=null; ENERGIA.ts=0; ENERGIA.cache=false; ENERGIA.error='Sin sesión: entra en el Panel (← Panel) y vuelve. Esta pestaña no usa datos de ejemplo.';
+    renderEnergia(); return;
+  }
+  const yo = ++ENERGIA.pedido, horas = ENERGIA.horas;
+  ENERGIA.cargando = true; actualizarEstadoEnergia();
+  try{
+    const meta = {};
+    const d = await api('/energia/balance?horas='+horas, meta);
+    if(yo!==ENERGIA.pedido) return;   // la reemplazó otra petición (cambió el rango)
+    if(!d || typeof d!=='object' || !d.collares || typeof d.collares!=='object') throw new Error('respuesta sin collares');
+    // La antigüedad es la del servidor (`generado`), no la del fetch: la copia de sw.js llega «ahora» pero es de antes.
+    ENERGIA.datos=d; ENERGIA.horasDatos=horas; ENERGIA.ts=tsDeRespuesta(d, Date.now()); ENERGIA.cache=!!meta.cache; ENERGIA.error=null;
+  }catch(e){
+    if(yo!==ENERGIA.pedido) return;
+    ENERGIA.error = textoErrorEnergia(e);
+  }finally{
+    if(yo===ENERGIA.pedido) ENERGIA.cargando=false;
+  }
+  renderEnergia();
+}
+// El estado y los avisos (error, copia sin red, datos viejos, otro rango) se recalculan en cada tick: la antigüedad
+//  crece aunque no llegue nada nuevo.
+function actualizarEstadoEnergia(){
+  const e=document.getElementById('e-estado'), g=document.getElementById('e-grid'), d=ENERGIA.datos;
+  g.classList.toggle('recargando', ENERGIA.cargando && !!d);
+  const o = { error:ENERGIA.error, hayDatos:!!d, ts:ENERGIA.ts, cache:ENERGIA.cache, horasDatos:ENERGIA.horasDatos,
+              horasPedidas:ENERGIA.horas, cargando:ENERGIA.cargando, ahora:Date.now(), zona:d && d.zona };
+  e.textContent = textoEstadoEnergia(o);
+  document.getElementById('e-aviso').innerHTML = avisosEnergia(o).map(t=>`<div class="e-banner">⚠ ${esc(t)}</div>`).join('');
+}
+function nombreCollar(dev){
+  if(DEMO) return '';
+  const c = collares.find(x=>x.device===dev);
+  return c && c.nombre && c.nombre!==dev ? c.nombre : '';
+}
+function renderEnergia(){
+  const d=ENERGIA.datos, g=document.getElementById('e-grid'), sel=document.getElementById('e-collar');
+  // El botón marcado es el rango PEDIDO (el que se reintenta); si lo que se ve es de otro, lo dice el aviso (C3).
+  document.getElementById('e-rango').innerHTML = htmlRangos(ENERGIA_RANGOS, ENERGIA.horas);
+  actualizarEstadoEnergia();
+  if(!d){ g.innerHTML = ENERGIA.cargando ? '<p class="empty">Cargando la energía…</p>' : ''; ENERGIA.geos={}; return; }
+  document.getElementById('e-nota').textContent = textoNotaEnergia(d);
+  document.getElementById('e-relaj').textContent = fmtNum(d.relajacion_h, 0);
+  const zp = textoZonaPlana(d); if(zp) document.getElementById('e-plana').textContent = zp;
+  const devs = Object.keys(d.collares).sort(), cur = sel.value;
+  sel.innerHTML = '<option value="">Todos los collares</option>' + devs.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');
+  sel.value = devs.includes(cur) ? cur : '';
+  const lista = devs.filter(k=>!sel.value || k===sel.value), ahora = Date.now();
+  g.innerHTML = lista.length
+    ? lista.map(dev=>htmlTarjetaEnergia(dev, d.collares[dev], d, { ahora, nombre:nombreCollar(dev), abiertos:ENERGIA.abiertos })).join('')
+    : '<p class="empty">El servidor no mandó collares.</p>';
+  ENERGIA.geos = {}; ENERGIA.anchoPintado = 0;
+  pintarGraficas();
+  for(const det of g.querySelectorAll('details.e-det')){
+    const llenar = ()=>{ const cu=det.querySelector('.det-cuerpo'), dev=det.closest('.ecard').dataset.dev;
+      if(cu && !cu.childElementCount && d.collares[dev]) cu.innerHTML = htmlTablaSerie(d.collares[dev].serie, d.zona); };
+    if(det.open) llenar();
+    det.addEventListener('toggle', ()=>{ if(det.open){ ENERGIA.abiertos.add(det.dataset.k); llenar(); } else ENERGIA.abiertos.delete(det.dataset.k); });
+  }
+}
+// Las gráficas se arman al ancho real de su caja (el texto no se deforma) y se rehacen si el ancho cambia.
+function pintarGraficas(){
+  const d=ENERGIA.datos; if(!d || VISTA!=='energia') return;
+  const els=[...document.querySelectorAll('#e-grid .graficas')];
+  if(!els.length || els[0].clientWidth<=0) return;   // pestaña escondida: se pinta al mostrarla
+  for(const el of els){
+    const dev=el.dataset.dev, c=d.collares[dev]; if(!c) continue;
+    const { html, geos } = htmlGraficas(dev, c, d, Math.max(200, Math.floor(el.clientWidth)));
+    el.innerHTML = html; ENERGIA.geos[dev] = geos; engancharCursor(el);
+  }
+  ENERGIA.anchoPintado = Math.floor(els[0].clientWidth);
+}
+function pintarGraficasSiCambio(){
+  const el=document.querySelector('#e-grid .graficas');
+  if(el && el.clientWidth>0 && Math.floor(el.clientWidth)!==ENERGIA.anchoPintado) pintarGraficas();
+}
+// Cursor: retícula vertical en las dos gráficas a la vez y un solo globo con todos los valores de ese momento.
+//  Ratón, dedo (arrastre horizontal; el vertical desplaza la página) y teclado (← → Inicio Fin, Mayús = 12 pasos).
+function engancharCursor(el){
+  if(el._cursor) return; el._cursor = true;
+  let idx = -1;
+  const datos = ()=>{ const d=ENERGIA.datos, c=d && d.collares[el.dataset.dev]; return c && ENERGIA.geos[el.dataset.dev] ? { c, geos:ENERGIA.geos[el.dataset.dev], zona:d.zona } : null; };
+  const ocultar = ()=>{ idx=-1; el.querySelectorAll('.cruz,.cruz-pt').forEach(n=>n.setAttribute('visibility','hidden')); const tp=el.querySelector('.tip'); if(tp) tp.hidden=true; };
+  const mostrar = (i, svgActivo)=>{   // el globo va junto a la gráfica que se está tocando (la otra puede no verse)
+    const x = datos(); if(!x || i<0 || i>=x.c.serie.length) return ocultar();
+    idx = i; const p = x.c.serie[i]; let ref = null;
+    for(const svg of el.querySelectorAll('svg.eg')){
+      const g = x.geos[svg.dataset.campo]; if(!g) continue;
+      const px = g.x(p.t), v = valorDe(p, svg.dataset.campo), ln = svg.querySelector('.cruz'), pt = svg.querySelector('.cruz-pt');
+      ln.setAttribute('x1', px); ln.setAttribute('x2', px); ln.setAttribute('visibility', 'visible');
+      if(v==null) pt.setAttribute('visibility', 'hidden');
+      else { pt.setAttribute('cx', px); pt.setAttribute('cy', g.y(v)); pt.setAttribute('visibility', 'visible'); }
+      if(!ref || svg===svgActivo) ref = { svg, px, g };
+    }
+    const tp = el.querySelector('.tip'); if(!tp || !ref) return;
+    tp.innerHTML = htmlTip(p, franjaEn(x.c.franjas, p.t), x.zona); tp.hidden = false;
+    // (un <svg> no tiene offsetLeft/offsetTop: la posición sale de los rectángulos)
+    const er = el.getBoundingClientRect(), sr = ref.svg.getBoundingClientRect(), k = sr.width / (ref.g.ancho || 1);
+    const xEl = sr.left - er.left + ref.px*k, w = tp.offsetWidth;
+    let left = xEl + 14; if(left + w > el.clientWidth) left = Math.max(0, xEl - 14 - w);
+    tp.style.left = left+'px'; tp.style.top = (sr.top - er.top + ref.g.y0*k)+'px';
+  };
+  const alPuntero = e=>{
+    const svg = e.target.closest && e.target.closest('svg.eg'), x = datos(); if(!svg || !x) return;
+    const g = x.geos[svg.dataset.campo], r = svg.getBoundingClientRect(); if(!g || !r.width) return;
+    const px = (e.clientX - r.left) * (g.ancho / r.width);
+    if(px < g.x0-6 || px > g.x1+6) return ocultar();
+    mostrar(indiceCercano(x.c.serie, g.t(px)), svg);
+  };
+  el.addEventListener('pointermove', alPuntero);
+  el.addEventListener('pointerdown', alPuntero);   // un toque en el teléfono también lo muestra
+  // Con el dedo, pointerleave llega al levantarlo: el globo se queda hasta tocar fuera (lo quita el document).
+  el.addEventListener('pointerleave', e=>{ if(e.pointerType!=='touch') ocultar(); });
+  el._ocultar = ocultar;
+  el.addEventListener('blur', ocultar);
+  // Con teclado (Tab) arranca en el último punto; un clic o toque ya mostró su propio punto.
+  el.addEventListener('focus', ()=>{ let tec=true; try{ tec=el.matches(':focus-visible'); }catch(e){} const x=datos(); if(x && tec) mostrar(x.c.serie.length-1); });
+  el.addEventListener('keydown', e=>{
+    const x = datos(); if(!x || !x.c.serie.length) return;
+    const n = x.c.serie.length, salto = e.shiftKey ? 12 : 1; let i = idx<0 ? n-1 : idx;
+    if(e.key==='ArrowLeft') i = Math.max(0, i-salto); else if(e.key==='ArrowRight') i = Math.min(n-1, i+salto);
+    else if(e.key==='Home') i = 0; else if(e.key==='End') i = n-1;
+    else if(e.key==='Escape'){ ocultar(); return; } else return;
+    e.preventDefault(); mostrar(i);
+  });
+}
 
 // ── datos demo (para diseñar/previsualizar sin backend) ──
 function usarDemo(msg){
@@ -393,12 +1099,29 @@ function usarDemo(msg){
 
 // init
 try{ veredictos=JSON.parse(localStorage.getItem('lindero_veredictos')||'{}'); }catch(e){ veredictos={}; }
-cargar(); programarAuto();
+document.getElementById('tabs').innerHTML = htmlPestanas(VISTAS, VISTA);
+document.getElementById('tabs').addEventListener('click', e=>{ const b=e.target.closest('[data-vista]'); if(b) mostrarVista(b.dataset.vista); });
+document.getElementById('tabs').addEventListener('keydown', e=>{ const id=vistaVecina(VISTAS, VISTA, e.key); if(id){ e.preventDefault(); mostrarVista(id, {foco:true}); } });
+document.getElementById('e-rango').addEventListener('click', e=>{
+  const b=e.target.closest('[data-horas]'); if(!b) return;
+  const h=horasValidas(b.dataset.horas); if(h===ENERGIA.horas) return;
+  ENERGIA.horas=h; guardarLS(CLAVE_HORAS, String(h));
+  document.getElementById('e-rango').innerHTML = htmlRangos(ENERGIA_RANGOS, h);
+  cargarEnergia({forzar:true});
+});
+window.addEventListener('hashchange', ()=>{ const h=location.hash.replace(/^#/,''); if(h!==VISTA && VISTAS.some(v=>v.id===h)) mostrarVista(h); });
+let _redim=0;
+window.addEventListener('resize', ()=>{ cancelAnimationFrame(_redim); _redim=requestAnimationFrame(()=>{ if(VISTA==='energia') pintarGraficasSiCambio(); }); });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && AUTO) tick(); });
+document.addEventListener('pointerdown', e=>{ for(const g of document.querySelectorAll('#e-grid .graficas')) if(g._ocultar && !g.contains(e.target)) g._ocultar(); });
+mostrarVista(vistaInicial(location.hash, leerLS(CLAVE_VISTA), VISTAS), {guardar:false});
+if(VISTA!=='collares') cargar();   // los nombres de los collares y el estado de la conexión
+programarAuto();
 // PWA: mismo service worker que el panel (solo HTTPS/localhost).
 if ('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) {
   window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{}));
 }
-window.addEventListener('online', cargar);
+window.addEventListener('online', refrescar);
 </script>
 </body>
 </html>
