@@ -26,10 +26,14 @@
     --sans:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
     --r:14px; --r-sm:9px;
     /* series de las gráficas (pestaña Energía): ranuras 1 y 2 de la paleta categórica para fondo oscuro, validadas
-       contra --panel; nunca los colores de estado. Las franjas con fuente van en tinta neutra. */
+       contra --panel; nunca los colores de estado. */
     --serie-1:#3987e5; /* % de batería */
     --serie-2:#d95926; /* voltaje */
-    --franja-carga:#e8efe612; --franja-lleno:#e8efe624;
+    /* CE2 (2026-10-15): franjas de /PGOOD por su clase. Panel en tinta neutra; cable (USB) en la ranura 3 (aqua) de la
+       misma paleta, rayada y rotulada «USB». Validada contra --panel con las dos series, todas las parejas
+       (validate_palette.js --mode dark --pairs all): CVD ΔE 9.4, visión normal 20.9, contraste ≥ 3:1. */
+    --franja-panel:#e8efe614; --franja-panel-lleno:#e8efe628;
+    --franja-usb:#199e70; --franja-usb-wash:#199e7026; --franja-usb-raya:#199e70a6;
   }
   *{box-sizing:border-box}
   [hidden]{display:none !important}
@@ -93,6 +97,10 @@
   .pill.warn{color:var(--warn);background:var(--warn-wash);border-color:#fbbf2433}
   .pill.bad{color:var(--bad);background:var(--bad-wash);border-color:#f8717133}
   .pill.mute{color:var(--ink-dim);background:var(--mute-wash);border-color:#7b8a7c33}
+  .pill.signal{color:var(--signal);background:var(--signal-wash);border-color:#38bdf833}
+  /* CE2: clase de una sesión o de un día excluido, con el color de su franja (identidad, no estado) y su icono */
+  .pill.usb{color:var(--ink);background:var(--franja-usb-wash);border-color:var(--franja-usb-raya)}
+  .pill.panel{color:var(--ink);background:var(--franja-panel-lleno);border-color:var(--border)}
   .fw{font-size:10.5px;color:var(--ink-faint);font-family:var(--mono)}
 
   .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin-bottom:11px}
@@ -163,7 +171,7 @@
   .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(560px,100%),1fr));gap:14px;transition:opacity .15s}
   .egrid.recargando{opacity:.55}
   .ecard{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--r);padding:15px 16px 14px;min-width:0}
-  .ecard .c-head{margin-bottom:8px}
+  .ecard .c-head{margin-bottom:8px;flex-wrap:wrap}
   .e-hero{font-size:13px;color:var(--ink-dim);margin:0 0 4px}
   .e-hero b{color:var(--ink);font-family:var(--mono);font-weight:600}
   .pill.grande{font-size:13px;padding:4px 11px}
@@ -178,7 +186,10 @@
   .lk{display:inline-block;width:16px;height:2px;border-radius:1px;flex-shrink:0}
   .lk-pct{background:var(--serie-1)} .lk-mv{background:var(--serie-2)}
   .sw{display:inline-block;width:12px;height:10px;border-radius:2px;border:1px solid var(--border)}
-  .sw-carga{background:var(--franja-carga)} .sw-lleno{background:var(--franja-lleno)}
+  .sw-panel{background:var(--franja-panel-lleno)}
+  .sw-usb{background:repeating-linear-gradient(45deg,var(--franja-usb-raya) 0 2px,var(--franja-usb-wash) 2px 5px);border-color:var(--franja-usb-raya)}
+  .pt-ancla{display:inline-block;width:8px;height:8px;margin:0 1px;background:var(--ink);transform:rotate(45deg);border-radius:1px}
+  .pt-ancla.hueca{background:transparent;border:1.5px solid var(--ink-dim)}
   .pt-fin{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink-dim)}
   .graficas{position:relative;outline:none;border-radius:8px;min-height:300px}
   .graficas:focus-visible{box-shadow:0 0 0 2px var(--accent-dim)}
@@ -187,14 +198,19 @@
   .eg text{font-family:var(--sans);font-size:10.5px;fill:var(--ink-faint);font-variant-numeric:tabular-nums}
   .eg .ty{text-anchor:end} .eg .tx{text-anchor:middle}
   .eg .vfin{fill:var(--ink);font-family:var(--mono);font-size:11.5px;font-weight:600}
-  .eg .fr-t{fill:var(--ink-dim);font-size:9.5px;font-weight:600}
+  .eg .fr-t{fill:var(--ink);font-size:9.5px;font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
   .eg .gy,.eg .gx{stroke:var(--border-soft);stroke-width:1}
   .eg .gx.mayor,.eg .eje{stroke:var(--border)}
   .eg .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
   .eg .fin,.eg .cruz-pt{stroke:var(--panel);stroke-width:2}
   .eg .cruz{stroke:var(--ink-dim);stroke-width:1}
   .eg .hit{fill:transparent;cursor:crosshair}
-  .eg .fr-carga{fill:var(--franja-carga)} .eg .fr-lleno{fill:var(--franja-lleno)}
+  /* CE2: panel en tinta neutra; cable (USB) con su patrón rayado (el fill va en el atributo: ninguna regla de aquí
+     puede ponerle fill a .fr-usb, porque el CSS le gana al atributo) */
+  .eg .fr-panel{fill:var(--franja-panel)} .eg .fr-panel.fr-lleno{fill:var(--franja-panel-lleno)}
+  .eg .fr-usb-fondo{fill:var(--franja-usb-wash)} .eg .fr-usb-raya{stroke:var(--franja-usb-raya);stroke-width:2}
+  .eg .ancla{fill:var(--panel);stroke:var(--ink-dim);stroke-width:1.5}
+  .eg .ancla.valida{fill:var(--ink);stroke:var(--panel);stroke-width:2}
   .tip{position:absolute;z-index:5;pointer-events:none;background:#0b120ef5;border:1px solid var(--border);border-radius:9px;
     padding:8px 10px;font-size:12px;min-width:160px;box-shadow:0 8px 24px #0009}
   .tip-t{font-size:11px;color:var(--ink-faint);margin-bottom:4px}
@@ -209,9 +225,28 @@
   .tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border-soft);border-radius:10px;max-width:100%}
   .tabla-scroll.alta{max-height:340px;overflow-y:auto}
   table.t{border-collapse:collapse;width:100%;font-size:12.5px}
-  table.t-dias{min-width:780px}
-  table.t-dias .dia{position:sticky;left:0;z-index:1;white-space:nowrap;background:var(--panel);box-shadow:1px 0 0 var(--border-soft)}
-  table.t-dias th.dia{z-index:2;background:var(--panel-2)}
+  table.t-dias{min-width:960px} table.t-excl{min-width:620px} table.t-ses{min-width:760px}
+  table.t .dia{position:sticky;left:0;z-index:1;white-space:nowrap;background:var(--panel);box-shadow:1px 0 0 var(--border-soft)}
+  table.t th.dia{z-index:2;background:var(--panel-2)}
+  table.t tr.en-curso td{background:var(--panel-2)}
+  table.t ul.mot{margin:0;padding-left:15px;color:var(--ink-dim);font-size:12px} table.t ul.mot li{margin:1px 0}
+  table.t .pill{font-size:11px;padding:2px 8px}
+  .dicho,table.t td.dicho{color:var(--ink-faint)}
+  .e-ahora{font-size:12px;color:var(--ink-dim);margin:10px 0 0;line-height:1.6}
+  .e-ahora b{color:var(--ink);font-weight:600;margin-right:3px}
+  .e-cosecha{margin-top:0;border-top:none;padding-top:2px}
+  .nw{white-space:nowrap}
+  /* En el teléfono los motivos de un día excluido no se leían en una columna de 100 px: cada día va en bloque
+     (día y por qué arriba; motivos y anclas a todo lo ancho), sin desplazamiento de lado */
+  @media(max-width:520px){
+    table.t.t-excl{min-width:0} table.t.t-excl thead{display:none}
+    table.t.t-excl tr{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:8px 9px;border-bottom:1px solid var(--border-soft)}
+    table.t.t-excl tr:last-child{border-bottom:none}
+    table.t.t-excl td{display:block;padding:0;border:none}
+    table.t.t-excl td.dia{position:static;box-shadow:none;background:none}
+    table.t.t-excl td:nth-child(3),table.t.t-excl td:nth-child(4){grid-column:1 / -1}
+    table.t.t-excl td.n{text-align:left}
+  }
   table.t th{position:sticky;top:0;background:var(--panel-2);font-weight:600;font-size:11px;color:var(--ink-dim);text-align:left;padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:bottom}
   table.t th small{display:block;font-weight:500;color:var(--ink-faint);font-size:10px}
   table.t td{padding:7px 9px;border-bottom:1px solid var(--border-soft);vertical-align:top}
@@ -289,18 +324,13 @@
       <span class="sp"></span>
       <span class="e-estado" id="e-estado" aria-live="polite">—</span>
     </div>
-    <p class="e-nota" id="e-nota">% por voltaje (BAT1) · días locales · mAh y mA <b>ESTIMADOS</b> con la capacidad nominal · se actualiza cada 5 min</p>
+    <p class="e-nota" id="e-nota">Solo panel: los días con cable (USB) no cuentan · ancla = voltaje crudo antes del amanecer · mAh <b>ESTIMADOS</b> (8–40 mAh por mV) · se actualiza cada 5 min</p>
     <div id="e-aviso"></div>
     <div class="egrid" id="e-grid"></div>
     <details class="e-como">
-      <summary>Cómo se calcula el balance</summary>
-      <ul>
-        <li><b>Subió</b>: lo que sube el % mientras hay fuente (panel o USB). Incluye el salto de medir cargando y le resta la relajación del voltaje de las primeras <span id="e-relaj">3</span> h a batería.</li>
-        <li><b>Bajó</b>: lo que baja el % a batería después de esas horas. <b>Neto</b> = % al final del día − % al inicio.</li>
-        <li>Un día cuenta para el veredicto si ya terminó, hay lecturas cerca de las 00:00 y de las 24:00, cubre ≥ 80 % del día y no hubo lecturas sin celda. Si el neto cabe en ±1 punto, empata dentro del error, salvo que ese día <b>se llenó</b> (con fuente llegó a ≥ 97 %): entonces carga más, porque el neto lo topa la capacidad.</li>
-        <li><b>Gasto a batería</b>: la pendiente del % a batería ya relajado, en mA. El «±» es solo el ruido del medidor (95 %), no el sesgo del modelo. En la zona plana del voltaje (<span id="e-plana">3.66–3.92 V</span>) puede estar muy desviado: sale marcado, y la autonomía que sale de él también. Arriba de 3.82 V la marca viene de datos reales: la celda se queda en 3.86–3.90 V por horas y la curva lo lee como un gasto de pocos mA.</li>
-        <li>Los mAh y mA son <b>ESTIMADOS</b>: usan la capacidad nominal de la celda (sin medir) y 1 punto = 1 % de esa capacidad.</li>
-      </ul>
+      <summary>Cómo se calcula «solo panel»</summary>
+      <!-- CE2 (2026-10-15): la lista la escribe htmlComo() con los números de la respuesta (al abrir, con los de D6 v2) -->
+      <ul id="e-como-lista"></ul>
     </details>
   </div>
 </section>
@@ -350,9 +380,13 @@ function sparkline(vals,color){
 }
 
 // ⟦ENERGIA-PURA⟧ inicio ─────────────────────────────────────────────────────────────────────────────
-// Pestañas y pestaña «Energía» (bloque CE, 2026-10-13). Todo lo de esta región es PURO: no toca el DOM ni la red,
-//  así la prueba (node tools/test_consola_energia.js) lo corre en un contexto vacío. Lo único de fuera que usa es
-//  esc(). Contrato del servidor: GET /energia/balance, docs/testing/BLOQUE_CONSOLA_ENERGIA.md (D6).
+// Pestañas y pestaña «Energía» (bloque CE, 2026-10-13; CE2 «solo panel», 2026-10-15). Todo lo de esta región es PURO: no
+//  toca el DOM ni la red, así la prueba (node tools/test_consola_energia.js) lo corre en un contexto vacío. Lo único de
+//  fuera que usa es esc(). Contrato del servidor: GET /energia/balance, docs/testing/BLOQUE_CONSOLA_ENERGIA.md (D6 v2).
+// CE2 (2026-10-15, Gilberto: «sí, corrige la consola así»): la pestaña contaba el USB como si fuera panel. Ahora contesta
+//  solo dos preguntas: si con SOLO el panel se mantiene la batería (anclas de madrugada día contra día; los días con
+//  cable salen aparte y no entran a nada) y qué tan bien rinde el panel (cosecha, sin corriente). La etiqueta `fuente`
+//  del collar (IO44) ya no decide nada: sale como dato secundario, «el collar dice».
 // Para AGREGAR UNA PESTAÑA: una entrada en VISTAS, un <section id="vista-ID" role="tabpanel" hidden> en el HTML y,
 //  si carga datos, su caso en alMostrar() y tick(). La barra de pestañas se arma sola.
 const VISTAS = Object.freeze([
@@ -363,13 +397,17 @@ const VISTA_POR_OMISION = 'collares';
 const ENERGIA_RANGOS = Object.freeze([
   Object.freeze({ horas:24, txt:'24 h' }), Object.freeze({ horas:72, txt:'3 días' }), Object.freeze({ horas:168, txt:'7 días' }) ]);
 const ENERGIA_HORAS_POR_OMISION = 168;
-// Los cubos del servidor son de 5 min y la salud llega cada 15: pedir más seguido no trae nada nuevo (y cada consulta
-//  le cuesta al servidor de Render, que tiene un solo hilo). Tras un error se reintenta al minuto.
+// La serie del servidor va en cubos de 5 min y la salud llega cada 15: pedir más seguido no trae nada nuevo (y cada
+//  consulta le cuesta al servidor de Render, que tiene un solo hilo). Tras un error se reintenta al minuto.
 const ENERGIA_REFRESCO_MS = 5*60*1000, ENERGIA_REINTENTO_MS = 60*1000;
 // Revisión adversarial 2 (2026-10-14): datos con más de 10 min desde que los generó el servidor = «no son de ahora»
 //  (el refresco normal es cada 5 min). Sin red, sw.js responde con la copia guardada y status 200.
 const ENERGIA_VIEJO_MS = 10*60*1000;
 const MARGEN_G = Object.freeze({ l:40, r:58, t:10, b:22 });   // px: eje Y a la izquierda, valor final a la derecha
+// CE2-9 (2026-10-15): la versión del contrato que entiende esta pestaña (D6 v2). Una respuesta sin `version: 2` es del
+//  servidor de antes (su veredicto contaba el USB como panel): se avisa «falta desplegar CE2» y no se muestra veredicto.
+const ENERGIA_VERSION = 2;
+const esV2 = r => !!r && typeof r==='object' && Number(r.version)===ENERGIA_VERSION;
 
 // ── pestañas ──
 // La pestaña al abrir: la del enlace (#energia) gana, luego la última elegida, luego la de omisión.
@@ -405,6 +443,17 @@ function fmtSigno(v, dec=1){   // con signo; el menos es el signo tipográfico (
   return r>0 ? '+'+s : r<0 ? '−'+s : s;
 }
 function fmtV(mv, dec=3){ return esNum(mv) && Number(mv)>0 ? (Number(mv)/1000).toFixed(dec)+' V' : '—'; }
+// mV con signo: entero sin decimales («+65 mV»), con medio mV con uno («+55.5 mV»).
+function fmtMv(v){ return esNum(v) ? fmtSigno(v, Number.isInteger(Number(v)) ? 0 : 1)+' mV' : '—'; }
+function fmtMin(m){   // 672 → «11 h 12 min»; 235 → «3 h 55 min»; 40 → «40 min»
+  if(!esNum(m)) return '—';
+  const n = Math.max(0, Math.round(Number(m))), h = Math.floor(n/60), r = n%60;
+  return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${r} min`;
+}
+function fmtFraccion(f){ return esNum(f) ? fmtNum(Number(f)*100, 0)+' %' : '—'; }
+const esPar = v => Array.isArray(v) && v.length===2 && v.every(esNum);
+function fmtIC(ic, unidad=' mV'){ return esPar(ic) ? `${fmtSigno(ic[0])} a ${fmtSigno(ic[1])}${unidad}` : '—'; }
+function fmtMah(m){ return esPar(m) ? `${fmtSigno(m[0],0)} a ${fmtSigno(m[1],0)}` : '—'; }
 function haceDesde(ts, ahora){
   const t = typeof ts==='number' ? ts : Date.parse(ts);
   if(!Number.isFinite(t)) return '—';
@@ -414,7 +463,6 @@ function haceDesde(ts, ahora){
   if(s<86400) return `hace ${fmtNum(s/3600, s<36000?1:0)} h`;
   return `hace ${fmtNum(s/86400, 1)} días`;
 }
-function fmtAutonomia(h){ if(!esNum(h)) return '—'; const n = Number(h); return n<48 ? `≈ ${fmtNum(n,0)} h` : `≈ ${fmtNum(n/24,1)} días`; }
 const _FORMATOS = {};
 function fmtTiempo(t, zona, tipo){
   const k = zona+'|'+tipo;
@@ -427,35 +475,102 @@ function fmtTiempo(t, zona, tipo){
   }
   return _FORMATOS[k].format(t);
 }
+function fmtHora(t, zona){ return esNum(t) ? fmtTiempo(Number(t), zona, 'hora') : '—'; }
 function fmtFecha(fecha){   // 'AAAA-MM-DD' (día local que ya calculó el servidor) → 'mar 13 de oct'
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha||''));
   return m ? fmtTiempo(Date.UTC(+m[1], +m[2]-1, +m[3], 12), 'UTC', 'fecha') : String(fecha||'—');
 }
+// La medianoche local en o antes de t (las líneas de los días en la gráfica). Antes salía de `dias[].desde` (el día de
+//  calendario del contrato viejo); en D6 v2 los días van de ancla a ancla y ya no traen medianoche: se saca de la zona.
+const _PARTES = {};
+function medianocheLocal(t, zona){
+  if(!esNum(t)) return null;
+  if(!_PARTES[zona]){
+    const o = { hourCycle:'h23', hour:'2-digit', minute:'2-digit', second:'2-digit' };
+    try{ _PARTES[zona] = new Intl.DateTimeFormat('en-US', { timeZone:zona, ...o }); }
+    catch(e){ _PARTES[zona] = new Intl.DateTimeFormat('en-US', o); }
+  }
+  const n = Number(t), p = {};
+  for(const x of _PARTES[zona].formatToParts(n)) p[x.type] = Number(x.value);
+  return n - (((p.hour%24)*60 + p.minute)*60 + p.second)*1000 - ((n%1000)+1000)%1000;
+}
+// Parámetros de la respuesta, con el valor de D6 v2 si faltan (servidor raro): los textos nunca dicen «undefined».
+function par(r, k, def){ return r && esNum(r[k]) ? Number(r[k]) : def; }
+function parPar(r, k, def){ return r && esPar(r[k]) ? r[k].map(Number) : def; }
+function mesetasDe(r){
+  const m = r && r.mesetas_mv;
+  return Array.isArray(m) && m.length && m.every(esPar) ? m.map(x=>x.map(Number)) : [[3660,3920],[4020,4050]];
+}
 // La marca ESTIMADO sale de la lista `estimados` de la respuesta, no de una lista propia.
 function etqEst(r, campo){
-  return (r && Array.isArray(r.estimados) && r.estimados.includes(campo))
-    ? `<abbr class="est" title="ESTIMADO: usa la capacidad nominal de la celda (${fmtNum(r.capacidad_mah,0)} mAh), sin medir">ESTIMADO</abbr>` : '';
+  if(!(r && Array.isArray(r.estimados) && r.estimados.includes(campo))) return '';
+  const m = parPar(r, 'mah_por_mv', [8,40]);
+  return `<abbr class="est" title="${esc(`ESTIMADO: el IC lleva ±${fmtNum(par(r,'sistematica_mv',2),0)} mV de dispersión de un día a otro `+
+    `y los mAh salen de ${fmtNum(m[0],0)}–${fmtNum(m[1],0)} mAh por mV, sin medir`)}">ESTIMADO</abbr>`;
 }
 function textoNotaEnergia(r){
-  return `% por voltaje (BAT1) · días locales de ${r.zona} · mAh y mA ESTIMADOS con ${fmtNum(r.capacidad_mah,0)} mAh nominales `+
-    `(1 punto = ${fmtNum(r.capacidad_mah/100,0)} mAh) · se actualiza cada ${Math.round(ENERGIA_REFRESCO_MS/60000)} min`;
+  // R6 (revisión adversarial, 2026-10-15): sin v2 (servidor de antes o más nuevo) no hay veredicto «solo panel».
+  if(!esV2(r)) return `Sin veredicto «solo panel» con esta respuesta: solo se muestra la batería · se actualiza cada `+
+    `${Math.round(ENERGIA_REFRESCO_MS/60000)} min`;
+  const m = parPar(r, 'mah_por_mv', [8,40]);
+  return `Solo panel: los días con cable (USB) no cuentan · ancla = voltaje crudo antes del amanecer · mAh ESTIMADOS `+
+    `(${fmtNum(m[0],0)}–${fmtNum(m[1],0)} mAh por mV) · días locales de ${(r && r.zona) || '—'} · se actualiza cada `+
+    `${Math.round(ENERGIA_REFRESCO_MS/60000)} min`;
 }
-// La zona plana del voltaje sale de la respuesta (revisión adversarial 2, 2026-10-14: se amplió a 3.92 V con datos
-//  reales; antes el límite de arriba, 3.82 V, estaba escrito a mano). Sin el campo (servidor viejo), null: se deja el texto fijo.
-function textoZonaPlana(r){
-  const z = r && Array.isArray(r.zona_plana_mv) && r.zona_plana_mv.length===2 && r.zona_plana_mv.every(esNum) ? r.zona_plana_mv : null;
-  return z ? `${(z[0]/1000).toFixed(2)}–${(z[1]/1000).toFixed(2)} V` : null;
+// «Cómo se calcula», con los números de la respuesta (sin respuesta, los de D6 v2). Solo números formateados y texto fijo.
+function htmlComo(r){
+  const sol = par(r,'sol_umbral_grados',-0.5), esc45 = par(r,'escalon_usb_mv',45), ev = parPar(r,'escalon_ventanas_min',[15,3]);
+  const buscar = par(r,'escalon_buscar_min',60);
+  const av = parPar(r,'ancla_ventana_min',[-60,-10]), amin = par(r,'ancla_min_reportes',15), cab = par(r,'cable_antes_h',12);
+  const hueco = par(r,'hueco_cable_min',60), sis = par(r,'sistematica_mv',2), B = par(r,'bootstrap_b',2000);
+  const mah = parPar(r,'mah_por_mv',[8,40]), dmin = par(r,'dias_tendencia_min',5), ss = par(r,'sin_subir_mv',3);
+  const V = mv => (mv/1000).toFixed(2);
+  return [
+    `<b>Panel o cable.</b> Cada tramo con /PGOOD (cargando o alimentado) es <b>cable (USB)</b> si tuvo /PGOOD con el sol a menos de `+
+      `${fmtSigno(sol)}°, un escalón de subida de ${fmtNum(esc45,0)} mV o más al conectar (mediana de los ${fmtNum(ev[0],0)} min de antes, `+
+      `a batería, contra los primeros ${fmtNum(ev[1],0)} min; tras un hueco se buscan hasta ${fmtNum(buscar,0)} min atrás), si el cargador `+
+      `terminó (alimentado sin cargar: con panel nunca ha pasado) o si el collar se reinició (grabado). Si no se vio cómo empezó (hueco `+
+      `largo o el principio de los datos), cuenta como <b>posible cable</b>: su día no vale y sale «sin datos». Si no, es <b>panel</b>. `+
+      `Un panel puesto a pleno sol podría dar el escalón (sin medir): ese motivo lo dice. Lo que dice el collar (IO44) no decide: al `+
+      `sol dice «USB» casi siempre.`,
+    `<b>Ancla.</b> La mediana del voltaje crudo a batería entre ${fmtNum(-av[0],0)} y ${fmtNum(-av[1],0)} min antes de la salida del sol `+
+      `(${fmtNum(amin,0)} reportes o más): la celda ya asentada y a la misma hora cada día. Δ = ancla del día siguiente − ancla del día.`,
+    `<b>Qué días cuentan.</b> Ni un minuto de cable desde ${fmtNum(cab,0)} h antes del ancla hasta el ancla del día siguiente, ningún `+
+      `hueco de más de ${fmtNum(hueco,0)} min (podría esconder un cable), algún minuto de panel y las dos anclas. Los demás salen en `+
+      `«Días excluidos» con su motivo y no entran a ningún promedio.`,
+    `<b>Veredicto del día.</b> IC95 de Δ por bootstrap (${fmtNum(B,0)} remuestras con semilla fija: misma entrada, misma salida) `+
+      `± ${fmtNum(sis,0)} mV de dispersión de un día a otro (ESTIMADO): <b>sube</b> si el IC queda arriba de 0, <b>baja</b> si queda `+
+      `abajo y <b>no se distingue de cero</b> si lo cruza: eso no quiere decir que el panel alcance, el IC dice cuánto podría faltar `+
+      `o sobrar. Si un ancla cae en una meseta de la celda, un Δ que no se distingue de cero no dice nada: <b>meseta, no se puede decir</b>.`,
+    `<b>Tendencia y veredicto de arriba.</b> Recta por las anclas de los días válidos (pendiente común si hay tramos separados por `+
+      `días excluidos), en mV/día ± IC95; con menos de 3 anclas, «faltan días». Con ${fmtNum(dmin,0)} días válidos o más el veredicto `+
+      `sale de la tendencia; con menos, del promedio de los días, marcado «provisional».`,
+    `<b>Cosecha del panel</b>, sin medir corriente: minutos con /PGOOD de panel, primera y última hora, fracción de las horas de sol `+
+      `con panel, subida del voltaje (mediana de los últimos 15 min de panel − la de los primeros 15), máximo (mediana de 15 min) y `+
+      `<b>cargando sin subir</b>: el tramo del inicio en que la mediana de 15 min no sube más de ${fmtNum(ss,0)} mV (sombra o panel débil).`,
+    `<b>mAh ESTIMADOS</b>, solo como rango de ${fmtNum(mah[0],0)} a ${fmtNum(mah[1],0)} mAh por mV: la curva de BAT1 no describe esta `+
+      `celda. En las mesetas (${mesetasDe(r).map(m=>`${V(m[0])}–${V(m[1])} V`).join(' y ')}) un día de consumo mueve pocos mV: no se `+
+      `dan mAh y sale un aviso.`,
+    `El <b>%</b> de la gráfica sigue siendo BAT1 por voltaje; las franjas dicen panel o cable según la primera regla.`,
+  ].map(t=>`<li>${t}</li>`).join('');
 }
 
-// ── antigüedad y rango de lo que se ve (revisión adversarial 2, 2026-10-14) ──
+// ── antigüedad, rango y versión de lo que se ve (revisión adversarial 2, 2026-10-14; CE2-9, 2026-10-15) ──
 // La hora de los datos es la del servidor (`generado`), no la del fetch: sin red, sw.js entrega la copia guardada
 //  con status 200 y antes la pestaña decía «datos de hace 0 s» aunque fuera de hace horas. Sin `generado`, la del fetch.
 function tsDeRespuesta(d, respaldo){ const t = Date.parse(d && d.generado); return Number.isFinite(t) ? t : respaldo; }
 function textoRango(h){ const r = ENERGIA_RANGOS.find(x=>x.horas===Number(h)); return r ? r.txt : `${fmtNum(h,0)} h`; }
-// o: { error, hayDatos, ts, cache, horasDatos, horasPedidas, cargando, ahora, zona }. cache = la respuesta trajo
+function textoFaltaCE2(version){
+  return esNum(version) && Number(version) > ENERGIA_VERSION
+    ? `El servidor responde la versión ${fmtNum(version,0)} del balance y esta consola entiende la ${ENERGIA_VERSION}: recarga la página.`
+    : 'El servidor todavía responde el balance de antes (sin «version: 2»): falta desplegar CE2. Hasta entonces no hay veredicto '+
+      '«solo panel»; el de antes contaba el USB como si fuera panel. Solo se muestra la batería.';
+}
+// o: { error, hayDatos, ts, cache, horasDatos, horasPedidas, cargando, ahora, zona, version }. cache = la respuesta trajo
 //  X-Lindero-Cache (la copia del service worker, sin red). Devuelve los avisos (texto plano; se escapan al pintar).
 function avisosEnergia(o){
   const out = [], hace = haceDesde(o.ts, o.ahora);
+  if(o.hayDatos && !esV2({ version:o.version })) out.push(textoFaltaCE2(o.version));   // CE2-9
   // Si falló el cambio de rango (7 días → 24 h con 500/429/sin red), el botón marca lo pedido (es lo que se reintenta)
   //  y aquí se dice de qué rango son los datos que se ven.
   const otroRango = !!o.hayDatos && esNum(o.horasDatos) && Number(o.horasDatos)!==Number(o.horasPedidas);
@@ -479,21 +594,34 @@ function textoEstadoEnergia(o){
 }
 
 // ── estados (icono + etiqueta; el color de estado nunca va solo) ──
+// CE2-4/CE2-7: el veredicto «solo panel» de un día o del resumen (D6 v2).
+// Revisión adversarial de CE2 (2026-10-15): «igual» se pintaba «= Se mantiene con solo panel», que contesta que sí a la
+//  pregunta de Gilberto cuando el IC solo dice que Δ no se distingue de cero (R3: con −7 a +2 mV el panel podía quedarse
+//  corto ~280 mAh por día; el texto del servidor trae el IC). «meseta» es un «igual» con un ancla en una meseta de la
+//  celda, donde Δ ≈ 0 no dice nada (R1).
 const VEREDICTOS = Object.freeze({
-  carga_mas: Object.freeze({ k:'ok',   ic:'▲', txt:'Carga más de lo que gasta', corto:'Carga más' }),
-  gasta_mas: Object.freeze({ k:'warn', ic:'▼', txt:'Gasta más de lo que carga', corto:'Gasta más' }),
-  sin_datos: Object.freeze({ k:'mute', ic:'○', txt:'Sin datos suficientes',     corto:'Sin datos' }),
+  sube:     Object.freeze({ k:'ok',     ic:'▲', txt:'Sube con solo panel',       corto:'Sube' }),
+  igual:    Object.freeze({ k:'signal', ic:'≈', txt:'No se distingue de cero',   corto:'No se distingue' }),
+  baja:     Object.freeze({ k:'warn',   ic:'▼', txt:'Baja con solo panel',       corto:'Baja' }),
+  meseta:   Object.freeze({ k:'mute',   ic:'▬', txt:'Meseta: no se puede decir', corto:'Meseta' }),
+  sin_dias: Object.freeze({ k:'mute',   ic:'○', txt:'Faltan días',               corto:'Faltan días' }),
 });
-const veredictoDe = v => VEREDICTOS[v] || VEREDICTOS.sin_datos;
+const veredictoDe = v => VEREDICTOS[v] || VEREDICTOS.sin_dias;
+// CE2-1: la clase de una sesión de /PGOOD (y de su franja), la que calcula el servidor. Nunca la de IO44.
+const CLASES = Object.freeze({
+  panel: Object.freeze({ ic:'☀', txt:'Panel',       largo:'panel',       pill:'panel' }),
+  usb:   Object.freeze({ ic:'🔌', txt:'Cable (USB)', largo:'cable (USB)', pill:'usb' }),
+});
+const claseDe = f => CLASES[f] || null;
 function cargadorDe(c){   // carga: 0 alimentado, 1 cargando, 2 a batería
   const n = esNum(c) ? Number(c) : null;
-  return n===1 ? { ic:'⚡', txt:'Cargando' } : n===0 ? { ic:'✓', txt:'Alimentado (lleno)' } : n===2 ? { ic:'🔋', txt:'A batería' } : { ic:'·', txt:'Sin dato' };
+  return n===1 ? { ic:'⚡', txt:'Cargando' } : n===0 ? { ic:'✓', txt:'Alimentado (sin cargar)' } : n===2 ? { ic:'🔋', txt:'A batería' } : { ic:'·', txt:'Sin dato' };
 }
-function fuenteDe(f){    // la de `actual` es número (0 ninguna, 1 panel, 2 USB); la de las franjas, texto
-  if(f==='panel' || f===1) return { ic:'☀', txt:'Panel' };
-  if(f==='usb' || f===2)   return { ic:'🔌', txt:'USB' };
-  if(f==='ninguna' || f===0) return { ic:'○', txt:'Ninguna' };
-  return { ic:'·', txt:'Sin dato' };
+// CE2-5: lo que dice el collar (IO44) es solo un dato secundario. `fuente_texto` es texto del servidor (se escapa).
+function dichoDelCollar(a){
+  if(a && a.fuente_texto) return esc(a.fuente_texto);
+  const f = a && esNum(a.fuente) ? Number(a.fuente) : null;
+  return f===1 ? 'panel' : f===2 ? 'USB' : f===0 ? 'ninguna' : 'sin dato';
 }
 
 // ── la serie ──
@@ -526,15 +654,32 @@ function indiceCercano(serie, t){
   return lo>0 && Math.abs(serie[lo-1].t - t) <= Math.abs(serie[lo].t - t) ? lo-1 : lo;
 }
 function franjaEn(franjas, t){ return (franjas||[]).find(f=>t>=f.desde && t<=f.hasta) || null; }
+// CE2-3: las anclas de madrugada para la gráfica del voltaje, una por madrugada (por su salida del sol). `valida` = la
+//  usa algún día válido; las demás son de días excluidos o del día en curso (se dibujan huecas).
+function anclasDe(c){
+  const m = new Map();
+  const poner = (a, valida) => {
+    if(!a || !esNum(a.mv) || !esNum(a.desde) || !esNum(a.hasta)) return;
+    const k = esNum(a.salida) ? Number(a.salida) : Number(a.desde), x = m.get(k);
+    if(x){ x.valida = x.valida || valida; return; }
+    m.set(k, { t:(Number(a.desde)+Number(a.hasta))/2, mv:Number(a.mv), n:a.n, desde:Number(a.desde), hasta:Number(a.hasta),
+               salida:esNum(a.salida) ? Number(a.salida) : null, valida });
+  };
+  for(const d of (c && c.dias)||[]){ poner(d.ancla, true); poner(d.ancla_siguiente, true); }
+  for(const x of (c && c.excluidos)||[]){ poner(x.ancla, false); poner(x.ancla_siguiente, false); }
+  if(c && c.en_curso) poner(c.en_curso.ancla, false);
+  return [...m.values()].sort((a,b)=>a.t-b.t);
+}
+function anclaEn(anclas, t, tol=0){ return (anclas||[]).find(a=>t>=a.desde-tol && t<=a.hasta+tol) || null; }
 function pasoLimpio(rango, n){
   const crudo = rango/Math.max(1,n), e = Math.pow(10, Math.floor(Math.log10(crudo))), f = crudo/e;
   return (f<=1 ? 1 : f<=2 ? 2 : f<=5 ? 5 : 10) * e;
 }
-// % fijo de 0 a 100 (se compara de un vistazo entre collares); el voltaje se acerca a los datos con un margen,
-//  con un mínimo de 100 mV para que el ruido de ±7 mV no parezca una montaña.
-function dominioDe(serie, campo){
+// % fijo de 0 a 100 (se compara de un vistazo entre collares); el voltaje se acerca a los datos (y a las anclas) con un
+//  margen, con un mínimo de 100 mV para que el ruido de ±7 mV no parezca una montaña.
+function dominioDe(serie, campo, extra){
   if(campo==='pct') return { v0:0, v1:100, paso:25 };
-  const vs = (serie||[]).map(p=>valorDe(p,'mv')).filter(v=>v!=null);
+  const vs = (serie||[]).map(p=>valorDe(p,'mv')).filter(v=>v!=null).concat((extra||[]).filter(v=>esNum(v) && v>0).map(Number));
   if(!vs.length) return { v0:3400, v1:4200, paso:200 };
   let lo = Math.min(...vs), hi = Math.max(...vs);
   if(hi-lo < 100){ const c = (lo+hi)/2; lo = c-50; hi = c+50; }
@@ -553,8 +698,8 @@ function geometria({ desde, hasta, ancho, alto, dom, m = MARGEN_G }){
   return { x0, x1, y0, y1, desde, hasta, ancho, alto, v0:dom.v0, v1:dom.v1,
     x: t => x0 + (t-desde)/span*(x1-x0), y: v => y1 - (v-dom.v0)/rango*(y1-y0), t: px => desde + (px-x0)/(x1-x0)*span };
 }
-// Marcas de tiempo alineadas a la medianoche local (la del primer día del servidor: sin horario de verano, sumar horas
-//  basta). El paso sale del ancho: una etiqueta cada ≥ 50 px («mié 14» mide ~36).
+// Marcas de tiempo alineadas a la medianoche local (medianocheLocal: sin horario de verano, sumar horas basta). El paso
+//  sale del ancho: una etiqueta cada ≥ 50 px («mié 14» mide ~36).
 function ticksTiempo({ desde, hasta, medianoche, anchoPlot, zona }){
   const H = 3600e3, span = (hasta-desde)/H, caben = Math.max(2, Math.floor(anchoPlot/50));
   const paso = [1,2,3,6,12,24,48,72].find(p=>span/p <= caben) || 168;
@@ -564,8 +709,7 @@ function ticksTiempo({ desde, hasta, medianoche, anchoPlot, zona }){
     const t = base + k*paso*H, mayor = Math.round((t-base)/H) % 24 === 0;
     out.push({ t, mayor, etiqueta: fmtTiempo(t, zona, mayor ? 'dia' : 'hora') });
   }
-  // Si las etiquetas van cada 2 o 3 días (teléfono), cada medianoche lleva igual su línea, sin texto: así se ven los
-  //  días del balance.
+  // Si las etiquetas van cada 2 o 3 días (teléfono), cada medianoche lleva igual su línea, sin texto: así se ven los días.
   if(paso > 24) for(let k = Math.ceil((desde-base)/(24*H)); base + k*24*H <= hasta; k++){
     const t = base + k*24*H; if(!out.some(o=>o.t===t)) out.push({ t, mayor:true, etiqueta:'' });
   }
@@ -574,15 +718,24 @@ function ticksTiempo({ desde, hasta, medianoche, anchoPlot, zona }){
 
 // ── las gráficas (SVG propio; la CSP no deja scripts de fuera) ──
 const r1 = v => Math.round(v*10)/10;
-function svgGrafica({ campo, serie, franjas, geo, dom, ticksX, maxGapMs, etiqueta, titulo }){
+const idSeguro = s => String(s).replace(/[^A-Za-z0-9_-]/g, '_');
+// CE2-9: las franjas dicen «panel» (tinta neutra) o «cable (USB)» (rayada, en la ranura 3 de la paleta: se distingue de
+//  las dos series y no depende solo del color: rayas y rótulo). En el voltaje, las anclas de madrugada (◆ las de días
+//  válidos, ◇ las demás).
+function svgGrafica({ campo, serie, franjas, anclas, geo, dom, ticksX, maxGapMs, etiqueta, titulo, idRayas }){
   const W = geo.ancho, H = geo.alto, color = campo==='pct' ? 'var(--serie-1)' : 'var(--serie-2)';
   const fmtY = campo==='pct' ? v=>fmtNum(v,0) : v=>(v/1000).toFixed(dom.paso>=100 ? 1 : 2);
   const p = [`<svg class="eg" data-campo="${campo}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titulo)}">`];
-  for(const fr of franjas||[]){   // franjas con fuente, detrás de todo
+  if((franjas||[]).some(f=>f.fuente==='usb'))
+    p.push(`<defs><pattern id="${idRayas}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">`+
+      `<rect class="fr-usb-fondo" width="6" height="6"/><line class="fr-usb-raya" x1="1" y1="0" x2="1" y2="6"/></pattern></defs>`);
+  for(const fr of franjas||[]){   // franjas de /PGOOD por su clase (CE2-1), detrás de todo
     const a = Math.max(geo.x0, geo.x(fr.desde)), b = Math.min(geo.x1, geo.x(fr.hasta));
     if(!(b > a)) continue;
-    p.push(`<rect class="fr ${fr.estado==='alimentado' ? 'fr-lleno' : 'fr-carga'}" x="${r1(a)}" y="${geo.y0}" width="${r1(Math.max(1, b-a))}" height="${geo.y1-geo.y0}"/>`);
-    if(fr.fuente==='usb' && b-a >= 28) p.push(`<text class="fr-t" x="${r1(a+4)}" y="${geo.y0+11}">USB</text>`);
+    const usb = fr.fuente==='usb';
+    p.push(`<rect class="fr ${usb ? 'fr-usb' : 'fr-panel'}${fr.estado==='alimentado' ? ' fr-lleno' : ''}" x="${r1(a)}" y="${geo.y0}" `+
+      `width="${r1(Math.max(1, b-a))}" height="${geo.y1-geo.y0}"${usb ? ` fill="url(#${idRayas})"` : ''}/>`);
+    if(usb && b-a >= 28) p.push(`<text class="fr-t" x="${r1(a+4)}" y="${geo.y0+11}">USB</text>`);
   }
   for(const v of ticksY(dom)){
     const y = r1(geo.y(v));
@@ -599,6 +752,12 @@ function svgGrafica({ campo, serie, franjas, geo, dom, ticksX, maxGapMs, etiquet
     if(s.length===1){ p.push(`<circle class="ln-pt" cx="${r1(geo.x(s[0].t))}" cy="${r1(geo.y(s[0].v))}" r="1.6" fill="${color}"/>`); continue; }
     p.push(`<polyline class="ln" stroke="${color}" points="${s.map(q=>r1(geo.x(q.t))+','+r1(geo.y(q.v))).join(' ')}"/>`);
   }
+  for(const an of anclas||[]){   // rombos de 10 px sobre la línea, con anillo del color del panel
+    if(an.t < geo.desde || an.t > geo.hasta) continue;
+    const x = r1(geo.x(an.t)), y = r1(geo.y(an.mv)), s = 5;
+    p.push(`<path class="ancla${an.valida ? ' valida' : ''}" data-t="${an.t}" data-mv="${an.mv}" `+
+      `d="M${x} ${r1(y-s)}L${r1(x+s)} ${y}L${x} ${r1(y+s)}L${r1(x-s)} ${y}Z"/>`);
+  }
   const uS = segs[segs.length-1], ult = uS ? uS[uS.length-1] : null;
   if(ult){   // el último dato: punto resaltado y su valor, en tinta (no en el color de la serie)
     const x = r1(geo.x(ult.t)), y = r1(geo.y(ult.v));
@@ -613,150 +772,243 @@ function svgGrafica({ campo, serie, franjas, geo, dom, ticksX, maxGapMs, etiquet
 }
 const GRAFICAS = Object.freeze([
   Object.freeze({ campo:'pct', alto:150, titulo:'% de batería (BAT1, por voltaje)', etq: v=>fmtNum(v,0)+' %' }),
-  Object.freeze({ campo:'mv',  alto:130, titulo:'Voltaje de la celda',              etq: v=>fmtV(v) }),
+  Object.freeze({ campo:'mv',  alto:140, titulo:'Voltaje de la celda',              etq: v=>fmtV(v) }),
 ]);
+// Sin `version: 2` (servidor de antes) se dibuja solo la batería: sus franjas salían de IO44 y no se muestran.
 function htmlGraficas(dev, c, r, ancho){
   const serie = (c && c.serie) || [];
   if(!serie.some(p=>valorDe(p,'pct')!=null || valorDe(p,'mv')!=null))
     return { html:'<p class="empty">Sin lecturas de batería en esta ventana.</p>', geos:null };
-  const desde = Date.parse(r.desde), hasta = Date.parse(r.generado);
-  const medianoche = c.dias && c.dias.length ? Date.parse(c.dias[0].desde) : null;
+  const v2 = esV2(r), franjas = v2 ? (c.franjas||[]) : [], anclas = v2 ? anclasDe(c) : [];
+  const desde = Date.parse(r.desde), hasta = Date.parse(r.generado), medianoche = medianocheLocal(desde, r.zona);
+  const enVentana = anclas.filter(a=>a.t>=desde && a.t<=hasta);
   const geos = {}, partes = [];
   for(const g of GRAFICAS){
-    const dom = dominioDe(serie, g.campo), geo = geometria({ desde, hasta, ancho, alto:g.alto, dom });
+    const conAnclas = g.campo==='mv';
+    const dom = dominioDe(serie, g.campo, conAnclas ? enVentana.map(a=>a.mv) : []);
+    const geo = geometria({ desde, hasta, ancho, alto:g.alto, dom });
     const vals = serie.map(p=>valorDe(p, g.campo)).filter(v=>v!=null);
-    const titulo = `${g.titulo} de ${dev}` + (vals.length ? `: de ${g.etq(vals[0])} a ${g.etq(vals[vals.length-1])} en ${r.horas} h` : ': sin datos');
+    const titulo = `${g.titulo} de ${dev}` + (vals.length ? `: de ${g.etq(vals[0])} a ${g.etq(vals[vals.length-1])} en ${r.horas} h` : ': sin datos') +
+      (conAnclas && enVentana.length ? `; ${enVentana.length} anclas de madrugada` : '');
     geos[g.campo] = geo;
     partes.push(`<div class="g-tit"><i class="lk lk-${g.campo}"></i>${esc(g.titulo)}</div>` +
-      svgGrafica({ campo:g.campo, serie, franjas:c.franjas, geo, dom, maxGapMs:huecoSerieMs(r), etiqueta:g.etq, titulo,
+      svgGrafica({ campo:g.campo, serie, franjas, anclas: conAnclas ? anclas : [], geo, dom, maxGapMs:huecoSerieMs(r), etiqueta:g.etq, titulo,
+                   idRayas:`rayas-${idSeguro(dev)}-${g.campo}`,
                    ticksX:ticksTiempo({ desde, hasta, medianoche, anchoPlot:geo.x1-geo.x0, zona:r.zona }) }));
   }
   return { html: partes.join('') + '<div class="tip" role="status" hidden></div>', geos };
 }
-function htmlTip(p, fr, zona){
+function htmlTip(p, fr, zona, an){
   if(!p) return '';
-  const pct = valorDe(p,'pct'), mv = valorDe(p,'mv'), cg = cargadorDe(p.carga), fu = fr ? fuenteDe(fr.fuente) : null;
+  const pct = valorDe(p,'pct'), mv = valorDe(p,'mv'), cg = cargadorDe(p.carga), cl = fr ? claseDe(fr.fuente) : null;
   return `<div class="tip-t">${esc(fmtTiempo(p.t, zona, 'completa'))}</div>`+
     `<div class="tip-r"><i class="lk lk-pct"></i><b>${pct==null ? (p.pct===-1 ? 'sin celda' : '—') : fmtNum(pct,0)+' %'}</b><span>% de batería</span></div>`+
     `<div class="tip-r"><i class="lk lk-mv"></i><b>${fmtV(mv)}</b><span>voltaje</span></div>`+
-    `<div class="tip-e">${cg.ic} ${esc(cg.txt)}${fu && fu.txt!=='Sin dato' ? ` · ${fu.ic} ${esc(fu.txt)}` : ''}</div>`;
+    `<div class="tip-e">${cg.ic} ${esc(cg.txt)}${cl ? ` · ${cl.ic} ${esc(cl.largo)}` : ''}</div>`+
+    (an ? `<div class="tip-e">${an.valida ? '◆' : '◇'} ancla del ${esc(fmtTiempo(esNum(an.salida) ? an.salida : an.t, zona, 'dia'))}: `+
+          `<b>${fmtV(an.mv)}</b> (mediana de ${fmtNum(an.n,0)})${an.valida ? '' : ' · de un día que no cuenta'}</div>` : '');
 }
-function htmlTablaSerie(serie, zona){   // la tabla alternativa de las dos gráficas (lo más nuevo arriba)
+function htmlTablaSerie(serie, zona, franjas){   // la tabla alternativa de las dos gráficas (lo más nuevo arriba)
   const filas = [...(serie||[])].reverse().map(p=>{
-    const pct = valorDe(p,'pct'), cg = cargadorDe(p.carga);
+    const pct = valorDe(p,'pct'), cg = cargadorDe(p.carga), fr = franjaEn(franjas, p.t), cl = fr ? claseDe(fr.fuente) : null;
     return `<tr><td>${esc(fmtTiempo(p.t, zona, 'completa'))}</td><td class="n">${pct==null ? (p.pct===-1 ? 'sin celda' : '—') : fmtNum(pct,0)+' %'}</td>`+
-      `<td class="n">${fmtV(valorDe(p,'mv'))}</td><td>${cg.ic} ${esc(cg.txt)}</td></tr>`;
+      `<td class="n">${fmtV(valorDe(p,'mv'))}</td><td>${cg.ic} ${esc(cg.txt)}</td><td>${cl ? `${cl.ic} ${esc(cl.largo)}` : '—'}</td></tr>`;
   }).join('');
   return `<div class="tabla-scroll alta"><table class="t t-serie"><thead><tr><th>Hora</th><th class="n">% de batería</th>`+
-    `<th class="n">Voltaje</th><th>Cargador</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+    `<th class="n">Voltaje</th><th>Cargador</th><th>Franja</th></tr></thead><tbody>${filas}</tbody></table></div>`;
 }
 
-// ── el balance diario ──
-function barraNeto(v, maxAbs){   // barra divergente chica: a la derecha sube, a la izquierda baja (el texto lleva el signo)
+// ── los días: válidos (solo panel), en curso y excluidos ──
+function barraDelta(v, maxAbs){   // barra divergente chica: a la derecha sube, a la izquierda baja (el texto lleva el signo)
   if(!esNum(v)) return '';
   const w = Math.min(28, Math.abs(v)/Math.max(1e-9, maxAbs)*28), x = v>=0 ? 30 : 30-w;
   return `<svg class="nb" width="60" height="8" viewBox="0 0 60 8" aria-hidden="true"><line x1="30" x2="30" y1="0" y2="8" stroke="var(--ink-faint)" stroke-width="1"/>`+
-    `<rect x="${r1(x)}" y="1" width="${r1(Math.max(w, 0.5))}" height="6" rx="1.5" fill="var(--serie-1)"/></svg>`;
+    `<rect x="${r1(x)}" y="1" width="${r1(Math.max(w, 0.5))}" height="6" rx="1.5" fill="var(--serie-2)"/></svg>`;
 }
-function pctMah(p, m){ return esNum(p) ? `<b>${fmtSigno(p)} %</b><div class="q">${fmtSigno(m,0)} mAh</div>` : '—'; }
-function textoGasto(o){   // o: un día o el resumen
-  if(!esNum(o.gasto_ma)) return null;
-  return `${fmtNum(o.gasto_ma)}${esNum(o.gasto_ruido_ma) ? ' ± '+fmtNum(o.gasto_ruido_ma) : ''} mA`;
+function celdaAnclas(a, b, conSiguiente=true){
+  const v = x => x && esNum(x.mv) ? fmtV(x.mv) : 'sin ancla';
+  const n = [a, conSiguiente ? b : null].filter(Boolean).map(x=>esNum(x.n) ? fmtNum(x.n,0) : '—').join(' / ');
+  const motivo = [a, conSiguiente ? b : null].find(x=>x && !esNum(x.mv) && x.motivo);
+  return `<td class="n"><b>${v(a)} → ${conSiguiente ? v(b) : '…'}</b>${n ? `<div class="q">${n} reportes</div>` : ''}`+
+    `${motivo ? `<div class="q">${esc(motivo.motivo)}</div>` : ''}</td>`;
 }
+// CE2-8: la cosecha en cuatro celdas (panel, luz, subida, «cargando sin subir»).
+function celdasCosecha(k, zona){
+  if(!k) return '<td class="n">—</td>'.repeat(4);
+  const hay = esNum(k.panel_min) && Number(k.panel_min)>0;
+  return `<td class="n"><b>${fmtMin(k.panel_min)}</b><div class="q">${hay && esNum(k.primera) ? `${fmtHora(k.primera, zona)}–${fmtHora(k.ultima, zona)}` : 'sin panel'}</div></td>`+
+    `<td class="n"><b>${fmtFraccion(k.fraccion_luz)}</b>${esNum(k.luz_min) ? `<div class="q">de ${fmtMin(k.luz_min)} de sol</div>` : ''}</td>`+
+    `<td class="n"><b>${fmtMv(k.subida_mv)}</b>${esNum(k.max_mv) ? `<div class="q">máx ${fmtV(k.max_mv)}</div>` : ''}</td>`+
+    `<td class="n"><b>${fmtMin(k.sin_subir_min)}</b>${esNum(k.sin_subir_hasta) ? `<div class="q">hasta las ${fmtHora(k.sin_subir_hasta, zona)}</div>` : ''}</td>`;
+}
+// CE2-6 y R1 (revisión adversarial, 2026-10-15): en un día de meseta el servidor ya no manda mAh (los 8–40 mAh por mV se
+//  quedan cortos por mucho): «—» y el aviso, no «IC —».
+function celdaMah(d){
+  const aviso = t => `<div class="q warn-t" title="${esc(d.aviso_meseta||'')}">${t}</div>`;
+  if(!esPar(d.mah)) return `<td class="n"><b>—</b>${d.meseta ? aviso('⚠ meseta: sin mAh') : ''}</td>`;
+  return `<td class="n"><b>${fmtMah(d.mah)}</b><div class="q">IC ${fmtMah(d.mah_ic)}</div>${d.meseta ? aviso('⚠ meseta') : ''}</td>`;
+}
+// CE2-3/4/8: la tabla de los días VÁLIDOS (lo más nuevo arriba) con el día en curso encima. Los excluidos van en otra.
 function htmlTablaDias(c, r){
-  const dias = (c && c.dias) || [];
-  if(!dias.length) return '<p class="empty">Sin días en esta ventana.</p>';
-  const maxAbs = Math.max(1, ...dias.map(d=>esNum(d.neto_pct) ? Math.abs(d.neto_pct) : 0));
-  const filas = [...dias].reverse().map(d=>{   // lo más nuevo arriba
-    const v = veredictoDe(d.veredicto), h = d.horas || {}, aj = d.ajustes || {};
-    const enCurso = !d.completo && /en curso/.test(d.motivo||'');
-    const ajTxt = [['saltos', aj.saltos_pct], ['relajación', aj.relajacion_pct]].filter(([,x])=>esNum(x) && Math.abs(x)>=0.05)
-      .map(([n,x])=>`${n} ${fmtSigno(x)}`).join(' · ');
-    const gasto = textoGasto(d);
-    // Columnas: primero la respuesta (neto y veredicto), luego de dónde sale. En el teléfono la tabla se desplaza
-    //  de lado con el día fijo a la izquierda.
-    return `<tr data-fecha="${esc(d.fecha)}">`+
-      `<td class="dia"><b>${esc(fmtFecha(d.fecha))}</b>${enCurso ? '<div class="q">hoy, en curso</div>' : ''}`+
-        `${esNum(h.sin_dato) && h.sin_dato>0 ? `<div class="q">${fmtNum(h.sin_dato)} h sin dato</div>` : ''}</td>`+
-      `<td class="n">${barraNeto(d.neto_pct, maxAbs)}${pctMah(d.neto_pct, d.neto_mah)}`+
-        `${esNum(aj.huecos_pct) && Math.abs(aj.huecos_pct)>=0.05 ? `<div class="q">huecos ${fmtSigno(aj.huecos_pct)}</div>` : ''}</td>`+
-      `<td><span class="pill ${v.k}">${v.ic} ${v.corto}</span>`+
-        `${d.veredicto==='sin_datos' && d.motivo ? `<div class="q">${esc(d.motivo)}</div>` : ''}`+
-        // Un día que se llenó tiene el neto topado: lo que decide es eso, no el margen de error.
-        `${d.lleno ? '<div class="q">se llenó: el neto lo topa la capacidad</div>' : ''}`+
-        `${d.dentro_del_error && !d.lleno && d.veredicto!=='sin_datos' && esNum(d.neto_pct) ? `<div class="q">≈ dentro del error (±${fmtNum(r.margen_pct,0)} punto)</div>` : ''}</td>`+
-      `<td class="n">${pctMah(d.subio_pct, d.subio_mah)}${ajTxt ? `<div class="q">incl. ${ajTxt}</div>` : ''}</td>`+
-      `<td class="n">${pctMah(esNum(d.bajo_pct) ? -d.bajo_pct : null, esNum(d.bajo_mah) ? -d.bajo_mah : null)}</td>`+
-      `<td class="n">${fmtNum(h.con_fuente)} h${esNum(h.alimentado) && h.alimentado>0 ? `<div class="q">lleno ${fmtNum(h.alimentado)} h</div>` : ''}</td>`+
-      `<td class="n">${fmtNum(h.a_bateria)} h</td>`+
-      `<td class="n">${gasto ? `<b>${gasto}</b>` : `<span title="${esc(d.gasto_motivo||'')}">—</span>`}`+
-        `${gasto && d.gasto_zona_plana ? `<div class="q warn-t" title="${esc(d.gasto_aviso||'')}">⚠ zona plana</div>` : ''}</td></tr>`;
+  const dias = (c && c.dias) || [], ec = c && c.en_curso, z = r.zona;
+  if(!dias.length && !ec) return '<p class="empty">Todavía no hay días válidos de solo panel en esta ventana.</p>';
+  const maxAbs = Math.max(1, ...dias.map(d=>esNum(d.delta_mv) ? Math.abs(d.delta_mv) : 0));
+  const filas = [];
+  if(ec){
+    const tipo = ec.cable ? `<span class="pill usb">🔌 No va a valer</span>${(ec.motivos||[]).map(t=>`<div class="q">${esc(t)}</div>`).join('')}`
+                          : '<span class="pill mute">◷ En curso</span>';
+    filas.push(`<tr class="en-curso" data-fecha="${esc(ec.fecha)}"><td class="dia"><b>${esc(fmtFecha(ec.fecha))}</b><div class="q">en curso</div></td>`+
+      `<td>${tipo}</td><td class="n">—<div class="q">falta el ancla de mañana</div></td><td class="n">—</td><td class="n">—</td>`+
+      celdaAnclas(ec.ancla, null, false) + celdasCosecha(ec.cosecha, z) + '</tr>');
+  }
+  for(const d of [...dias].reverse()){
+    const v = veredictoDe(d.veredicto), sig = d.ancla_siguiente && d.ancla_siguiente.salida;
+    filas.push(`<tr data-fecha="${esc(d.fecha)}"><td class="dia"><b>${esc(fmtFecha(d.fecha))}</b>`+
+        `${esNum(sig) ? `<div class="q">→ amanecer del ${esc(fmtTiempo(sig, z, 'dia'))}</div>` : ''}</td>`+
+      `<td><span class="pill ${v.k}">${v.ic} ${v.corto}</span></td>`+
+      `<td class="n">${barraDelta(d.delta_mv, maxAbs)}<b>${fmtMv(d.delta_mv)}</b></td>`+
+      `<td class="n">${fmtIC(d.ic_mv)}</td>`+
+      celdaMah(d)+
+      celdaAnclas(d.ancla, d.ancla_siguiente) + celdasCosecha(d.cosecha, z) + '</tr>');
+  }
+  return `<div class="tabla-scroll"><table class="t t-dias"><thead><tr><th class="dia">Día</th><th>Veredicto</th>`+
+    `<th class="n">Δ<small>ancla mañana − ancla</small></th><th class="n">IC95 de Δ<small>mV ${etqEst(r,'dias[].ic_mv')}</small></th>`+
+    `<th class="n">mAh<small>rango ${etqEst(r,'dias[].mah')}</small></th><th class="n">Anclas<small>madrugada → siguiente</small></th>`+
+    `<th class="n">Panel<small>/PGOOD</small></th><th class="n">Luz con panel</th><th class="n">Subida al sol</th>`+
+    `<th class="n">Cargando sin subir</th></tr></thead><tbody>${filas.join('')}</tbody></table></div>`;
+}
+function tipoExcluido(x){
+  return x.cable ? '<span class="pill usb">🔌 Cable (USB)</span>' : x.sin_panel ? '<span class="pill mute">○ Sin panel</span>'
+                 : '<span class="pill mute">⚠ Sin datos</span>';
+}
+function htmlTablaExcluidos(c, r){
+  const ex = (c && c.excluidos) || [];
+  if(!ex.length) return '<p class="empty">Ningún día excluido en esta ventana.</p>';
+  const filas = [...ex].reverse().map(x=>`<tr data-fecha="${esc(x.fecha)}"><td class="dia"><b>${esc(fmtFecha(x.fecha))}</b></td>`+
+    `<td>${tipoExcluido(x)}</td><td><ul class="mot">${(x.motivos||[]).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></td>`+
+    celdaAnclas(x.ancla, x.ancla_siguiente) + '</tr>').join('');
+  return `<div class="tabla-scroll"><table class="t t-excl"><thead><tr><th class="dia">Día</th><th>Por qué</th><th>Motivos</th>`+
+    `<th class="n">Anclas</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+// CE2-1: cada sesión de /PGOOD con su clase y por qué. «El collar dice» (IO44) va al final, en tinta tenue: no decide.
+function htmlTablaSesiones(c, r){
+  const ses = (c && c.sesiones) || [], z = r.zona;
+  if(!ses.length) return '<p class="empty">Sin sesiones de /PGOOD (ni panel ni cable) en esta ventana.</p>';
+  const filas = [...ses].reverse().map(s=>{
+    const cl = claseDe(s.tipo) || { ic:'·', txt:'—', pill:'mute' }, d = s.dice_el_collar || {};
+    const mismoDia = fmtTiempo(s.desde, z, 'fecha')===fmtTiempo(s.hasta, z, 'fecha');
+    const porque = s.tipo==='usb' ? (s.motivos||[]).map(m=>`<span title="${esc(m.texto||'')}">${esc(m.corto||m.clave||'')}</span>`).join(', ')
+                                  : 'ninguna señal de cable';
+    return `<tr><td class="dia"><b>${esc(fmtTiempo(s.desde, z, 'completa'))}</b><div class="q">a ${esc(fmtTiempo(s.hasta, z, mismoDia ? 'hora' : 'completa'))}</div></td>`+
+      `<td class="n">${fmtMin(s.minutos)}</td><td><span class="pill ${cl.pill}">${cl.ic} ${esc(cl.txt)}</span></td>`+
+      `<td>${porque}${s.escalon_motivo ? `<div class="q">escalón: ${esc(s.escalon_motivo)}</div>` : ''}</td>`+
+      `<td class="n">${esNum(s.sol_min_grados) ? `${fmtSigno(s.sol_min_grados)}° a ${fmtSigno(s.sol_max_grados)}°` : '—'}</td>`+
+      `<td class="n">${fmtMv(s.escalon_mv)}</td>`+
+      `<td class="n dicho">USB ${fmtNum(d.usb,0)} · panel ${fmtNum(d.panel,0)}${esNum(d.ninguna) && d.ninguna>0 ? ` · ninguna ${fmtNum(d.ninguna,0)}` : ''}</td></tr>`;
   }).join('');
-  return `<div class="tabla-scroll"><table class="t t-dias"><thead><tr><th class="dia">Día</th>`+
-    `<th class="n">Neto<small>% · mAh ${etqEst(r,'dias[].neto_mah')}</small></th><th>Veredicto</th>`+
-    `<th class="n">Subió<small>% · mAh ${etqEst(r,'dias[].subio_mah')}</small></th><th class="n">Bajó<small>% · mAh ${etqEst(r,'dias[].bajo_mah')}</small></th>`+
-    `<th class="n">Con fuente</th><th class="n">A batería</th><th class="n">Gasto a batería<small>mA ${etqEst(r,'dias[].gasto_ma')}</small></th>`+
-    `</tr></thead><tbody>${filas}</tbody></table></div>`;
+  return `<div class="tabla-scroll"><table class="t t-ses"><thead><tr><th class="dia">Desde</th><th class="n">Duración</th><th>Clase</th>`+
+    `<th>Por qué</th><th class="n">Sol</th><th class="n">Escalón<small>al conectar</small></th>`+
+    `<th class="n">El collar dice<small>IO44: no decide</small></th></tr></thead><tbody>${filas}</tbody></table></div>`;
 }
 
 // ── la tarjeta de un collar ──
-function htmlResumenEnergia(c, r, ahora){
+function htmlResumenEnergia(c, r){
   const s = c.resumen || {}, v = veredictoDe(s.veredicto);
-  let txt;
-  if(s.veredicto==='sin_datos' || !esNum(s.neto_medio_pct_dia)) txt = 'Ningún día completo en esta ventana: mira el día en curso en la tabla.';
-  else {
-    const dias = s.veredicto==='carga_mas' ? `cargó más ${s.dias_carga_mas} de ${s.dias_completos}` : `gastó más ${s.dias_gasta_mas} de ${s.dias_completos}`;
-    txt = `Neto medio <b>${fmtSigno(s.neto_medio_pct_dia)} % al día</b> (${fmtSigno(s.neto_medio_mah_dia,0)} mAh${etqEst(r,'resumen.neto_medio_mah_dia')}) · ${dias} días completos`+
-      (s.se_llena ? ` · se llenó ${fmtNum(s.dias_llenos,0)} de ${fmtNum(s.dias_completos,0)} días: el neto lo topa la capacidad`
-        : s.dentro_del_error ? ` · ≈ dentro del error (±${fmtNum(r.margen_pct,0)} punto): prácticamente empata` : '');
-  }
-  return { pill:`<span class="pill ${v.k} grande">${v.ic} ${v.txt}</span>`, txt };
+  const prov = s.provisional ? `<span class="pill mute">provisional · ${fmtNum(s.dias_validos,0)} de ${fmtNum(par(r,'dias_tendencia_min',5),0)} días</span>` : '';
+  return { pill:`<span class="pill ${v.k} grande">${v.ic} ${v.txt}</span>`, prov, txt: esc(s.texto || v.txt) };
 }
-function htmlStatsEnergia(c, r, ahora){
-  const a = c.actual || {}, s = c.resumen || {}, cg = cargadorDe(a.carga), fu = fuenteDe(a.fuente);
-  const gasto = textoGasto(s);
-  // «Ahora» es el % del tablero (BAT1 con las últimas lecturas); la serie filtra en cubos de 5 min, va más suave y
-  //  puede ir unos minutos atrás (documento, D2). Si difieren a la vista, se dice para que no parezca un error.
-  const vals = (c.serie||[]).map(p=>valorDe(p,'pct')).filter(v=>v!=null), ultSerie = vals.length ? vals[vals.length-1] : null;
-  const difiere = esNum(a.pct) && a.pct>=0 && ultSerie!=null && Math.abs(a.pct-ultSerie) >= 2;
-  const m = (lbl, val, sub) => `<div class="m"><div class="m-lbl">${lbl}</div><div class="m-val">${val}</div>${sub ? `<div class="m-sub">${sub}</div>` : ''}</div>`;
+const tile = (lbl, val, sub) => `<div class="m"><div class="m-lbl">${lbl}</div><div class="m-val">${val}</div>${sub ? `<div class="m-sub">${sub}</div>` : ''}</div>`;
+// CE2-4/6/7: arriba de la tarjeta, Δ por día con su IC, la tendencia, el rango de mAh (ESTIMADO) y los días.
+function htmlStatsEnergia(c, r){
+  const s = c.resumen || {}, t = s.tendencia || {}, nV = esNum(s.dias_validos) ? Number(s.dias_validos) : 0;
+  const base = s.base==='tendencia' ? `de la tendencia de ${fmtNum(nV,0)} días válidos`
+             : s.base==='promedio' ? `promedio de ${nV===1 ? '1 día válido' : fmtNum(nV,0)+' días válidos'}: provisional`
+             : 'sin días válidos todavía';
+  const medio = esPar(t.ic_mv_dia) ? (t.ic_mv_dia[1]-t.ic_mv_dia[0])/2 : null;
+  const ex = esNum(s.dias_excluidos) ? Number(s.dias_excluidos) : 0, cab = Number(s.dias_excluidos_cable)||0, sp = Number(s.dias_sin_panel)||0;
+  const otros = Math.max(0, ex - cab - sp);
+  const exTxt = ex ? `${fmtNum(ex,0)} excluidos: ${[cab && `${fmtNum(cab,0)} por cable`, sp && `${fmtNum(sp,0)} sin panel`, otros && `${fmtNum(otros,0)} sin datos`].filter(Boolean).join(', ')}`
+                   : 'ningún día excluido';
   return `<div class="e-stats">`+
-    m('Batería ahora', esNum(a.pct) && a.pct>=0 ? `${fmtNum(a.pct,0)}<span class="q">%</span>` : (a.pct===-1 ? 'sin celda' : '—'),
-      `${fmtV(a.mv)}${a.ts ? ' · '+haceDesde(a.ts, ahora) : ''}${a.origen && a.origen!=='voltaje' ? ' · % del modelo' : ''}`+
-      `${difiere ? `<div>la gráfica, más suavizada, marca ${fmtNum(ultSerie,0)} %</div>` : ''}`)+
-    m('Cargador', `${cg.ic} ${esc(cg.txt)}`, a.incoherente ? '<span class="e-aviso">⚠ dice cargando sin fuente (/CHG y /PGOOD se contradicen)</span>' : (a.ts ? haceDesde(a.ts, ahora) : ''))+
-    m('Fuente', `${fu.ic} ${esc(fu.txt)}`, a.fuente_ts ? 'salud '+haceDesde(a.fuente_ts, ahora) : 'sin salud reciente')+
-    m(`Gasto a batería${etqEst(r,'resumen.gasto_ma')}`, gasto ? esc(gasto) : '—',
-      gasto ? `sin sol, ${fmtNum(s.gasto_horas)} h a batería${s.gasto_zona_plana
-        ? `<div class="e-aviso" title="${esc(s.gasto_aviso||'')}">⚠ zona plana del voltaje: puede estar muy desviado</div>` : ''}`
-            : esc(s.gasto_motivo||''))+
-    // Revisión adversarial 2 (2026-10-14): la autonomía sale del gasto; si el gasto está en la zona plana, ella también
-    //  lleva la marca (MENA-0001 real: 9.7 mA y «26 días» en la meseta de 3.86–3.89 V).
-    m(`Autonomía sin sol${etqEst(r,'resumen.autonomia_h')}`, esc(fmtAutonomia(s.autonomia_h)), esNum(s.autonomia_h) ? `del % de ahora al 0 % (${fmtNum(s.autonomia_h,0)} h)`+
-      `${s.autonomia_zona_plana ? `<div class="e-aviso" title="${esc(s.autonomia_aviso||'')}">⚠ zona plana del voltaje: puede estar muy desviada</div>` : ''}` : '')+
+    tile('Δ por día', esNum(s.media_mv_dia) ? `${fmtSigno(s.media_mv_dia)}<span class="q">mV/día</span>` : '—',
+      (esNum(s.media_mv_dia) ? `IC95${etqEst(r,'resumen.ic_mv_dia')}<div class="nw">${fmtIC(s.ic_mv_dia)}</div><div>${esc(base)}</div>` : esc(base)))+
+    tile('Tendencia', esNum(t.mv_dia) && medio!=null ? `${fmtSigno(t.mv_dia)} ± ${fmtNum(medio)}<span class="q">mV/día</span>` : 'faltan días',
+      esNum(t.mv_dia) ? `IC95${etqEst(r,'resumen.tendencia.ic_mv_dia')}<div class="nw">${fmtIC(t.ic_mv_dia)}</div><div>${fmtNum(t.anclas,0)} anclas`+
+        `${esNum(t.tramos) && t.tramos>1 ? ` en ${fmtNum(t.tramos,0)} tramos` : ''}</div>` : esc(t.motivo || ''))+
+    tile(`mAh por día${etqEst(r,'resumen.mah_dia')}`, esPar(s.mah_dia) ? `${fmtMah(s.mah_dia)}<span class="q">mAh</span>` : '—',
+      (esPar(s.mah_dia) ? `IC${etqEst(r,'resumen.mah_ic_dia')}<div class="nw">${fmtMah(s.mah_ic_dia)} mAh</div><div>${fmtNum(parPar(r,'mah_por_mv',[8,40])[0],0)}–`+
+        `${fmtNum(parPar(r,'mah_por_mv',[8,40])[1],0)} mAh por mV</div>` : '')+
+      // R1: con alguna ancla en una meseta el servidor no manda mAh: se dice por qué.
+      (s.meseta ? `<div class="e-aviso" title="${esc(s.aviso_meseta||'')}">⚠ meseta de la celda: ${esPar(s.mah_dia) ? 'el rango puede quedarse corto' : 'sin mAh'}</div>` : ''))+
+    tile('Días', `${fmtNum(nV,0)}<span class="q">válidos</span>`, esc(exTxt))+
     `</div>`;
 }
+// CE2-8: la cosecha del ÚLTIMO día válido; sin días válidos, la de hoy (en curso, todavía no cuenta).
+function htmlCosechaBloque(c, r){
+  const dias = c.dias || [], ult = dias[dias.length-1], ec = c.en_curso, z = r.zona;
+  let k, tit, nota = '';
+  if(ult){ k = ult.cosecha; tit = `último día válido, ${fmtFecha(ult.fecha)}`; }
+  else if(ec && ec.cosecha){
+    k = ec.cosecha; tit = `${fmtFecha(ec.fecha)}, en curso`;
+    nota = ec.cable ? `<p class="e-aviso">⚠ Ya hubo cable (USB): este día no va a valer. ${esc((ec.motivos||[]).join(' · '))}</p>`
+                    : '<p class="e-pie">Todavía no hay días válidos: es lo del día en curso hasta ahora, y no cuenta hasta el ancla de la madrugada siguiente.</p>';
+  }
+  else return '<h3 class="e-sub">Cosecha del panel</h3><p class="e-error">Sin días válidos ni día en curso en esta ventana.</p>';
+  const cab = `<h3 class="e-sub">Cosecha del panel · ${esc(tit)}</h3>`;
+  if(!(k && esNum(k.panel_min) && Number(k.panel_min)>0))
+    return cab + nota + '<p class="e-error">Sin panel: ni un minuto de /PGOOD de panel en ese día.</p>';
+  return cab + `<div class="e-stats e-cosecha">`+
+    tile('Panel (/PGOOD)', esc(fmtMin(k.panel_min)), `${fmtNum(k.sesiones,0)} ${Number(k.sesiones)===1 ? 'sesión' : 'sesiones'}`)+
+    tile('Primera y última', `${fmtHora(k.primera, z)}–${fmtHora(k.ultima, z)}`, 'hora local')+
+    tile('Luz con panel', fmtFraccion(k.fraccion_luz), esNum(k.luz_min) ? `de ${fmtMin(k.luz_min)} de sol` : '')+
+    tile('Subida al sol', fmtMv(k.subida_mv), esNum(k.max_mv) ? `máximo ${fmtV(k.max_mv)}` : '')+
+    tile('Cargando sin subir', esc(fmtMin(k.sin_subir_min)), esNum(k.sin_subir_hasta) ? `hasta las ${fmtHora(k.sin_subir_hasta, z)}` : '')+
+    `</div>` + nota;
+}
+// Lo de ahora, en un renglón secundario. CE2-5: «el collar dice» (IO44) va en tinta tenue y no decide nada.
+function htmlAhora(c, ahora){
+  const a = c.actual;
+  if(!a) return '<p class="e-ahora"><b>Ahora</b> sin datos del collar.</p>';
+  const cg = cargadorDe(a.carga), pct = esNum(a.pct) && a.pct>=0 ? fmtNum(a.pct,0)+' % (BAT1)' : a.pct===-1 ? 'sin celda' : null;
+  return `<p class="e-ahora"><b>Ahora</b> ${fmtV(a.mv)}${pct ? ' · '+pct : ''}${a.origen && a.origen!=='voltaje' ? ' (% del modelo)' : ''} · `+
+    `${cg.ic} ${esc(cg.txt)}${a.ts ? ' · '+haceDesde(a.ts, ahora) : ''} · <span class="dicho" title="IO44 (VBUS_SENSE): al sol dice «USB» `+
+    `casi siempre; no decide nada">el collar dice: ${dichoDelCollar(a)}${a.fuente_ts ? ` (salud ${haceDesde(a.fuente_ts, ahora)})` : ''}</span>`+
+    `${a.incoherente ? '<span class="e-aviso">⚠ dice cargando sin /PGOOD (/CHG y /PGOOD se contradicen)</span>' : ''}</p>`;
+}
+const LEYENDA_BATERIA = '<span><i class="lk lk-pct"></i>% de batería</span><span><i class="lk lk-mv"></i>Voltaje</span>';
 function htmlTarjetaEnergia(dev, c, r, op = {}){
   const ahora = esNum(op.ahora) ? op.ahora : Date.parse(r.generado), abiertos = op.abiertos || new Set();
   const cab = `<div class="c-head"><div><div class="c-name">${esc(dev)}</div>${op.nombre ? `<div class="c-dev">${esc(op.nombre)}</div>` : ''}</div>`;
+  const graf = `<div class="graficas" data-dev="${esc(dev)}" tabindex="0" aria-label="Gráficas de ${esc(dev)}. Con las flechas izquierda y derecha se recorren los puntos."></div>`;
   if(!c || c.error) return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right"><span class="pill mute">○ Sin cálculo</span></div></div>`+
     `<p class="e-error">⚠ ${esc((c && c.error) || 'el servidor no mandó datos de este collar')}</p></article>`;
-  const res = htmlResumenEnergia(c, r, ahora), n = (c.serie||[]).length, k = 'serie:'+dev;
-  return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right">${res.pill}</div></div>`+
+  // R6 (revisión adversarial, 2026-10-15): con un servidor MÁS nuevo la tarjeta decía «falta desplegar CE2» mientras la
+  //  banda decía «recarga la página». Ahora las dos salen de textoFaltaCE2().
+  if(!esV2(r)) return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right"><span class="pill mute grande">○ Sin veredicto</span></div></div>`+
+    `<p class="e-error">${esc(textoFaltaCE2(r && r.version))}</p>`+
+    `<div class="leyenda">${LEYENDA_BATERIA}<span><i class="pt-fin"></i>Último dato</span></div>${graf}</article>`;
+  const res = htmlResumenEnergia(c, r), n = (c.serie||[]).length, kS = 'serie:'+dev, kP = 'sesiones:'+dev;
+  const nEx = (c.excluidos||[]).length, nSes = (c.sesiones||[]).length;
+  return `<article class="ecard" data-dev="${esc(dev)}">${cab}<div class="right">${res.pill}${res.prov}</div></div>`+
     `<p class="e-hero">${res.txt}</p>`+
-    htmlStatsEnergia(c, r, ahora)+
-    `<div class="leyenda"><span><i class="lk lk-pct"></i>% de batería</span><span><i class="lk lk-mv"></i>Voltaje</span>`+
-      `<span><i class="sw sw-carga"></i>Con fuente, cargando</span><span><i class="sw sw-lleno"></i>Con fuente, lleno</span><span><i class="pt-fin"></i>Último dato</span></div>`+
-    `<div class="graficas" data-dev="${esc(dev)}" tabindex="0" aria-label="Gráficas de ${esc(dev)}. Con las flechas izquierda y derecha se recorren los puntos."></div>`+
-    `<details class="e-det" data-k="${esc(k)}"${abiertos.has(k) ? ' open' : ''}><summary>Ver los datos de las gráficas en tabla (${n} puntos)</summary><div class="det-cuerpo"></div></details>`+
-    `<h3 class="e-sub">Balance diario</h3>${htmlTablaDias(c, r)}`+
-    `<p class="e-pie">Días de ${esc(r.zona)}. «Subió» incluye los saltos de medir cargando y resta la relajación de las primeras ${fmtNum(r.relajacion_h,0)} h a batería; el neto no cambia.</p>`+
+    htmlStatsEnergia(c, r)+
+    htmlCosechaBloque(c, r)+
+    htmlAhora(c, ahora)+
+    `<div class="leyenda">${LEYENDA_BATERIA}<span><i class="sw sw-panel"></i>Panel (/PGOOD)</span>`+
+      `<span><i class="sw sw-usb"></i>Cable (USB): ese día no cuenta</span><span><i class="pt-ancla"></i>Ancla de madrugada</span>`+
+      `<span><i class="pt-ancla hueca"></i>Ancla de un día que no cuenta</span><span><i class="pt-fin"></i>Último dato</span></div>`+
+    graf+
+    `<details class="e-det" data-k="${esc(kS)}"${abiertos.has(kS) ? ' open' : ''}><summary>Ver los datos de las gráficas en tabla (${n} puntos)</summary><div class="det-cuerpo"></div></details>`+
+    `<h3 class="e-sub">Días válidos · solo panel</h3>${htmlTablaDias(c, r)}`+
+    `<h3 class="e-sub">Días excluidos · no cuentan (${nEx})</h3>${htmlTablaExcluidos(c, r)}`+
+    `<details class="e-det" data-k="${esc(kP)}"${abiertos.has(kP) ? ' open' : ''}><summary>Sesiones de /PGOOD: panel o cable y por qué (${nSes})</summary>${htmlTablaSesiones(c, r)}</details>`+
+    `<p class="e-pie">Días de ${esc(r.zona)}. Un día va del ancla de su madrugada a la del día siguiente; los excluidos no entran a ningún promedio ni a la tendencia.</p>`+
     `</article>`;
 }
 function textoErrorEnergia(e){
   const s = String(e && e.message || e || '');
   if(s==='401' || s==='403') return 'La sesión expiró o no vale: vuelve a entrar en el Panel.';
-  if(s==='404') return 'El servidor todavía no tiene GET /energia/balance (falta desplegar el bloque CE).';
+  if(s==='404') return 'El servidor todavía no tiene GET /energia/balance: falta desplegar CE2 (backend).';
   if(s==='429') return 'El servidor está limitando las peticiones (429): espera unos minutos.';
   return `No se pudo traer la energía del servidor (${s || 'error de red'}).`;
 }
@@ -974,8 +1226,9 @@ async function cargarEnergia({forzar=false}={}){
 function actualizarEstadoEnergia(){
   const e=document.getElementById('e-estado'), g=document.getElementById('e-grid'), d=ENERGIA.datos;
   g.classList.toggle('recargando', ENERGIA.cargando && !!d);
+  // CE2-9: `version` = la de los datos que se ven; sin la 2, el aviso «falta desplegar CE2».
   const o = { error:ENERGIA.error, hayDatos:!!d, ts:ENERGIA.ts, cache:ENERGIA.cache, horasDatos:ENERGIA.horasDatos,
-              horasPedidas:ENERGIA.horas, cargando:ENERGIA.cargando, ahora:Date.now(), zona:d && d.zona };
+              horasPedidas:ENERGIA.horas, cargando:ENERGIA.cargando, ahora:Date.now(), zona:d && d.zona, version:d ? d.version : undefined };
   e.textContent = textoEstadoEnergia(o);
   document.getElementById('e-aviso').innerHTML = avisosEnergia(o).map(t=>`<div class="e-banner">⚠ ${esc(t)}</div>`).join('');
 }
@@ -991,8 +1244,7 @@ function renderEnergia(){
   actualizarEstadoEnergia();
   if(!d){ g.innerHTML = ENERGIA.cargando ? '<p class="empty">Cargando la energía…</p>' : ''; ENERGIA.geos={}; return; }
   document.getElementById('e-nota').textContent = textoNotaEnergia(d);
-  document.getElementById('e-relaj').textContent = fmtNum(d.relajacion_h, 0);
-  const zp = textoZonaPlana(d); if(zp) document.getElementById('e-plana').textContent = zp;
+  document.getElementById('e-como-lista').innerHTML = htmlComo(esV2(d) ? d : null);
   const devs = Object.keys(d.collares).sort(), cur = sel.value;
   sel.innerHTML = '<option value="">Todos los collares</option>' + devs.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');
   sel.value = devs.includes(cur) ? cur : '';
@@ -1004,7 +1256,7 @@ function renderEnergia(){
   pintarGraficas();
   for(const det of g.querySelectorAll('details.e-det')){
     const llenar = ()=>{ const cu=det.querySelector('.det-cuerpo'), dev=det.closest('.ecard').dataset.dev;
-      if(cu && !cu.childElementCount && d.collares[dev]) cu.innerHTML = htmlTablaSerie(d.collares[dev].serie, d.zona); };
+      if(cu && !cu.childElementCount && d.collares[dev]) cu.innerHTML = htmlTablaSerie(d.collares[dev].serie, d.zona, esV2(d) ? d.collares[dev].franjas : []); };
     if(det.open) llenar();
     det.addEventListener('toggle', ()=>{ if(det.open){ ENERGIA.abiertos.add(det.dataset.k); llenar(); } else ENERGIA.abiertos.delete(det.dataset.k); });
   }
@@ -1030,7 +1282,10 @@ function pintarGraficasSiCambio(){
 function engancharCursor(el){
   if(el._cursor) return; el._cursor = true;
   let idx = -1;
-  const datos = ()=>{ const d=ENERGIA.datos, c=d && d.collares[el.dataset.dev]; return c && ENERGIA.geos[el.dataset.dev] ? { c, geos:ENERGIA.geos[el.dataset.dev], zona:d.zona } : null; };
+  // CE2: con v2 el globo también dice la clase de la franja (panel o cable) y el ancla de madrugada bajo el cursor
+  //  (tolerancia de medio paso: la serie llega decimada y el ancla dura 50 min).
+  const datos = ()=>{ const d=ENERGIA.datos, c=d && d.collares[el.dataset.dev]; return c && ENERGIA.geos[el.dataset.dev]
+    ? { c, geos:ENERGIA.geos[el.dataset.dev], zona:d.zona, v2:esV2(d), tol:huecoSerieMs({ hueco_max_min:0, paso_min:d.paso_min })/2 } : null; };
   const ocultar = ()=>{ idx=-1; el.querySelectorAll('.cruz,.cruz-pt').forEach(n=>n.setAttribute('visibility','hidden')); const tp=el.querySelector('.tip'); if(tp) tp.hidden=true; };
   const mostrar = (i, svgActivo)=>{   // el globo va junto a la gráfica que se está tocando (la otra puede no verse)
     const x = datos(); if(!x || i<0 || i>=x.c.serie.length) return ocultar();
@@ -1044,7 +1299,7 @@ function engancharCursor(el){
       if(!ref || svg===svgActivo) ref = { svg, px, g };
     }
     const tp = el.querySelector('.tip'); if(!tp || !ref) return;
-    tp.innerHTML = htmlTip(p, franjaEn(x.c.franjas, p.t), x.zona); tp.hidden = false;
+    tp.innerHTML = htmlTip(p, x.v2 ? franjaEn(x.c.franjas, p.t) : null, x.zona, x.v2 ? anclaEn(anclasDe(x.c), p.t, x.tol) : null); tp.hidden = false;
     // (un <svg> no tiene offsetLeft/offsetTop: la posición sale de los rectángulos)
     const er = el.getBoundingClientRect(), sr = ref.svg.getBoundingClientRect(), k = sr.width / (ref.g.ancho || 1);
     const xEl = sr.left - er.left + ref.px*k, w = tp.offsetWidth;
@@ -1100,6 +1355,7 @@ function usarDemo(msg){
 // init
 try{ veredictos=JSON.parse(localStorage.getItem('lindero_veredictos')||'{}'); }catch(e){ veredictos={}; }
 document.getElementById('tabs').innerHTML = htmlPestanas(VISTAS, VISTA);
+document.getElementById('e-como-lista').innerHTML = htmlComo(null);   // «Cómo se calcula» con los números de D6 v2
 document.getElementById('tabs').addEventListener('click', e=>{ const b=e.target.closest('[data-vista]'); if(b) mostrarVista(b.dataset.vista); });
 document.getElementById('tabs').addEventListener('keydown', e=>{ const id=vistaVecina(VISTAS, VISTA, e.key); if(id){ e.preventDefault(); mostrarVista(id, {foco:true}); } });
 document.getElementById('e-rango').addEventListener('click', e=>{

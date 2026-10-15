@@ -23,7 +23,7 @@
 //                    commit invalida la cache aunque nadie se acuerde.
 //   v9 (2026-09-18): toro del logo en la barra (SVG en linea), temas verde/cafe/arena,
 //                    pestañas sin emojis y barra inferior en movil.
-const VER = 'lindero-v9-8579d5d';
+const VER = 'lindero-v9-59d36d2';
 const SHELL = `${VER}-shell`;
 const CDN   = `${VER}-cdn`;
 const TILES = `${VER}-tiles`;
